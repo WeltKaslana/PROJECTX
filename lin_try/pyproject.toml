@@ -11,7 +11,7 @@ index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 extra-index-url = ["https://mirrors.aliyun.com/pypi/simple/","https://repo.huaweicloud.com/repository/pypi/simple"]
 
 # 缓存与安装设置
-cache-dir = "E:202506project/bytecreek/uv_cache"  # 自定义缓存路径
+cache-dir = "E:/202506project/bytecreek/uv_cache"  # 自定义缓存路径
 link-mode = "symlink"       # 链接模式：symlink/copy/hardlink
 
 # 依赖解析策略
