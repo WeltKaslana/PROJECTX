@@ -1,21 +1,17 @@
-import os
+import os, inspect, json
 from dotenv import load_dotenv
 from langchain_deepseek import ChatDeepSeek
-from langchain_core.prompts import PromptTemplate
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.prompts import MessagesPlaceholder
-from langchain_core.messages import HumanMessage
-from langchain_core.messages import SystemMessage, AIMessage
-from langchain_core.prompts import StringPromptTemplate
-import inspect
+from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
+from langchain_core.prompts import StringPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain import hub
 from langsmith import Client
 from pydantic import BaseModel,Field,model_validator
-from langchain_core.output_parsers import PydanticOutputParser
-from langchain_core.output_parsers import XMLOutputParser
+from langchain_core.output_parsers import PydanticOutputParser, XMLOutputParser
+from langchain_core.output_parsers import StrOutputParser
 from langchain.output_parsers import RetryOutputParser
 from langchain_core.exceptions import OutputParserException
-import json
+from langchain_core.runnables import RunnableParallel, chain
 
 load_dotenv()
 
@@ -35,11 +31,14 @@ def main():
     # print(res)
 
     #code1  字符串模版
+    {
     # prompt = PromptTemplate.from_template("你是⼀个{name}，帮我起⼀个具有{country}特⾊的{sex}名字")
     # prompts = prompt.format(name="算命⼤师", country="中国", sex="⼥孩")
     # print(prompts)
+    }
 
     #code2 对话模版
+    {
     # chat_template = ChatPromptTemplate.from_messages(
     #     [
     #         {"role": "system", "content": "你是⼀个起名⼤师，你的名字叫{name}"},
@@ -52,8 +51,10 @@ def main():
     # )
     # chats = chat_template.format_messages(name="吕半仙⼉", user_input="你的爷爷是谁呢？ ")
     # print(chats)
+    }
 
     #code3  占位符模版
+    {
     # prompt_template = ChatPromptTemplate(
     #     [
     #         {"role": "system", "content": "你是⼀个超级⼈⼯智能助⼿"},
@@ -63,8 +64,10 @@ def main():
     # )
     # result = prompt_template.invoke({"msgs":[HumanMessage("请帮我写⼀个关于机器学习的⽂章")]})
     # print(result)
+    }
 
     #code4 使用Message组合模版
+    {
     # sys = SystemMessage(
     #     content="你是⼀个起名⼤师",
     #     additional_kwargs = {"⼤师姓名": "吕半仙⼉"}
@@ -77,8 +80,10 @@ def main():
     # )
     # mesg = [sys,human,ai]
     # print(mesg)
+    }
 
-    #code5
+    #code5 自定义模版
+    {
     # def hello_world(abc):
     #     print("Hello World!")
     #     return abc
@@ -108,8 +113,10 @@ def main():
     # pm = a.format(function_name= hello_world)
     # print("格式化之后的提示词为=======>")
     # print(pm)
+    }
 
     #code6 push、pull自定义模版模版
+    {
     # client=Client(api_key=langsmith_key)
     # # 使⽤ from_messages 构造多轮对话结构
     # prompt = ChatPromptTemplate.from_messages(
@@ -128,8 +135,10 @@ def main():
     # # print(pro.invoke({"question":"What is the capital of France?"}))
     # # res = model.invoke(pro.invoke({"question":"What is the capital of France?"}))
     # # print(res)
+    }
 
     #code7 调用公共的hub模版
+    {
     # client=Client(api_key=langsmith_key)
     # pro=client.pull_prompt("rlm/rag-prompt")
     # # print(pro)
@@ -137,9 +146,11 @@ def main():
     #     "context": "China is a great country. It is a country of peace and love.",
     #     "question":"Who is the current leader of China?"}))
     # print(res)
+    }
 
 
-    #code8
+    #code8 模型输出解析
+    {
     # class Joke(BaseModel):
     #     setup: str = Field(..., description="笑话中的铺垫问题，必须以？结尾")
     #     punchline: str = Field(..., description="笑话中回答铺垫问题的部分，通常是⼀种抖包袱⽅式回答铺垫问题，例如谐⾳、会错意等")
@@ -187,6 +198,38 @@ def main():
     #     retry = RetryOutputParser.from_llm(parser=parser, llm=model)
     #     retry_res = retry.parse_with_prompt(res, prompt_value)
     #     print(retry_res)
+    }
+
+    # code9 并行chain运行大模型
+    {
+    # joke_prompt =ChatPromptTemplate.from_template("tell me a joke about {topic}")
+    # story_prompt = ChatPromptTemplate.from_template("tell me a story about {topic}")
+    # # joke_chain = joke_prompt | model | StrOutputParser()
+    # joke_chain = joke_prompt.pipe(model).pipe(StrOutputParser())
+    # story_chain = story_prompt | model | StrOutputParser()
+    
+    # map_chain = RunnableParallel(joke = joke_chain, topic = story_chain)
+    # print(map_chain.invoke({"topic": "football"}))
+    }
+
+    #code10 利用@chain修饰符将函数转为chain
+    {
+    # prompt1 = ChatPromptTemplate.from_template("tell me a joke about {topic}")
+    # prompt2 = ChatPromptTemplate.from_template("tell me the subject of this joke: {joke}")
+
+    # @chain
+    # def defchain(text):
+    #     joke_prompt = prompt1.invoke({"topic":text})
+    #     joke = model.invoke(joke_prompt)
+    #     output1 = StrOutputParser().parse(joke)
+    #     print(output1)
+
+    #     chain2 = prompt2 | model | StrOutputParser()
+    #     print(chain2.invoke({"joke":output1}))
+    # defchain.invoke("football")
+    }
+    
+    
     
 
 if __name__ == "__main__":
