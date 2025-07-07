@@ -17,8 +17,3 @@ class History(db.Model):
     session_id = db.Column(db.String(25), primary_key=True, autoincrement=False) # 会话ID
     # session_id = f'{username}:{conversation_id:4d}
     created_at = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp()) # 创建时间
-    updated_at = db.Column(
-        db.TIMESTAMP, 
-        server_default=db.func.current_timestamp(),
-        server_onupdate=db.func.current_timestamp()
-    ) # 更新时间

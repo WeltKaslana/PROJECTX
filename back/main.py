@@ -1,12 +1,10 @@
-from flask import Flask, jsonify, request, Response
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
-from dao import userDAO
-from models import db, User
+from flask import Flask, request, Response
 from waitress import serve
 import json
 import logging
 
+from dao import userDAO
+from models import db
 from spider import result
 from ai import ai_get_history, ai_get_keywords
 
