@@ -1,7 +1,23 @@
 <script setup>
 import { ref } from 'vue'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElButton, ElDropdown, ElMenu, ElMenuItem } from 'element-plus'
 import elementPlusLogo from '@/assets/logo.png'
+
+
+// 监听路由变化
+// App.vue 中使用 useRoute 来获取当前路由信息
+// 并使用 computed 来创建一个响应式的 currentRoute 变量
+// 当excludePaths 中的路径与当前路由匹配时，输入框和提交按钮将被隐藏
+const route = useRoute()
+const currentRoute = computed(() => route)
+const excludePaths = computed(() => [
+  '/help',        // 帮助页面
+  '/settings',    // 设置页面
+  '/about',       // 关于页面
+])
+
 
 import {
   Document,
@@ -9,6 +25,7 @@ import {
   Location,
   Setting,
 } from '@element-plus/icons-vue'
+import router from './router'
 
 const isLoggedIn = ref(false)
 const username = ref('用户名')
@@ -96,25 +113,25 @@ const submitMessage = () => {
                   <el-menu-item @click="logout">退出</el-menu-item>
                 </el-menu>
               </template>
-            </el-dropdown> 
-          </div> 
+            </el-dropdown>
+          </div>
         </el-menu>
       </el-header>
-      
+
       <el-container>
         <el-aside width="230px" class="aside">
-          <el-menu default-active="2" class="el-menu-vertical-demo">
+          <el-menu default-active="2" class="el-menu-vertical-demo" :router="true" mode="vertical">
             <!--创建新聊天-->
-            <el-menu-item index="1" @click="createNewChat">
+            <el-menu-item index="/chat" @click="createNewChat">
               <el-icon><icon-menu /></el-icon>
               <span>创建新聊天</span>
             </el-menu-item>
 
             <!--商品筛选-->
-            <el-menu-item index="2" @click="filterProducts">
+            <el-menu-item index="/shopping" @click="filterProducts">
               <el-icon><icon-menu /></el-icon>
               <span>商品筛选</span>
-            </el-menu-item>  
+            </el-menu-item>
 
             <!-- 历史聊天 -->
             <el-menu-item index="3" @click="viewHistory">
@@ -125,21 +142,24 @@ const submitMessage = () => {
             <!-- 固定底部 -->
             <div class="bottom-buttons">
               <!-- 用户设置 -->
-              <el-menu-item index="4" @click="openSettings">
-                <el-icon><Setting /></el-icon>
+              <el-menu-item index="/settings" @click="openSettings">
+                <el-icon>
+                  <Setting />
+                </el-icon>
                 <span>用户设置</span>
+
               </el-menu-item>
 
               <!-- 帮助 -->
-              <el-menu-item index="5" :to="{ path: '/help' }"> 
-                <el-icon><Location /></el-icon>
-                <span>帮助</span>
+              <el-menu-item index="/help" @click="openHelp">
+                <el-icon>
+                  <Location />
+                </el-icon>
+                <span>帮助页面</span>
               </el-menu-item>
             </div>
           </el-menu>
-          <div>
-            <router-link to="/help">帮助</router-link>
-          </div>
+
         </el-aside>
         <el-main class="main">
           <router-view />
@@ -147,13 +167,13 @@ const submitMessage = () => {
       </el-container>
     </el-container>
 
-     <!-- 中间的输入框和提交按钮 -->
-    <div class="chat-box">
+    <!-- 中间的输入框和提交按钮 建议挪到对应的组件里而非App.vue，否则扩展困难-->
+    <div v-if="!excludePaths.includes(currentRoute.path)" class="chat-box">
       <div class="input-wrapper">
-      <img style="width: 100px" src="@/assets/logo.png" alt="logo" class="chat-logo" />
-      <div class="input-label">你好，我是智能购物机</div>
-      <el-input v-model="message" placeholder="请输入消息..." class="message-input"></el-input>
-      <el-button type="primary" class="submit-btn" @click="submitMessage">↑</el-button>
+        <img style="width: 100px" src="@/assets/logo.png" alt="logo" class="chat-logo" />
+        <div class="input-label">你好，我是智能购物机</div>
+        <el-input v-model="message" placeholder="请输入消息..." class="message-input"></el-input>
+        <el-button type="primary" class="submit-btn" @click="submitMessage">↑</el-button>
       </div>
     </div>
   </div>
@@ -168,10 +188,14 @@ const submitMessage = () => {
 .login-btn {
   float: right;
   display: flex;
-  justify-content: center; /* 水平居中 */
-  align-items: center;     /* 垂直居中 */
-  margin-top: 5px; /* 调整按钮与顶部的距离 */
-  margin-right: 5px; /* 确保按钮靠右 */
+  justify-content: center;
+  /* 水平居中 */
+  align-items: center;
+  /* 垂直居中 */
+  margin-top: 5px;
+  /* 调整按钮与顶部的距离 */
+  margin-right: 5px;
+  /* 确保按钮靠右 */
 }
 
 /* 修改登录按钮样式：黑色背景，白色字体 */
@@ -200,7 +224,8 @@ const submitMessage = () => {
 }
 
 .bottom-buttons {
-  margin-top: 300px; /* 固定底部 */
+  margin-top: 300px;
+  /* 固定底部 */
   padding: 1px;
 }
 
@@ -225,26 +250,29 @@ const submitMessage = () => {
 }
 
 .input-label {
-  font-size: 30px; 
-  color: black;     
-  margin-bottom: 30px; 
+  font-size: 30px;
+  color: black;
+  margin-bottom: 30px;
   text-align: center;
-  font-weight: bold; 
+  font-weight: bold;
 }
 
 .chat-box {
   position: absolute;
-  top: 50%;  /* 垂直居中 */
-  left: 50%; /* 水平居中 */
+  top: 75%;
+  /* 垂直居中 */
+  left: 50%;
+  /* 水平居中 */
   transform: translate(-40%, -50%);
-  width: 700px;
+  width: 900px;
 }
 
 .input-wrapper {
-  text-align:center;
+  text-align: center;
 }
 
 .message-input {
+  vertical-align: top;
   width: 100%;
   height: 200px;
   margin-bottom: 10px;
@@ -254,17 +282,20 @@ const submitMessage = () => {
 .submit-btn {
   width: 40px;
   height: 40px;
-  border-radius: 100%; /* 使按钮变圆 */
+  border-radius: 100%;
+  /* 使按钮变圆 */
   position: absolute;
-  bottom: 20px; /* 按钮位置靠近文本框右下角 */
-  right: 15px; /* 放置到右下角 */
+  bottom: 20px;
+  /* 按钮位置靠近文本框右下角 */
+  right: 15px;
+  /* 放置到右下角 */
   padding: 0;
   font-size: 20px;
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: black; 
-  color:white;
+  background-color: black;
+  color: white;
   border-color: black;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 }
