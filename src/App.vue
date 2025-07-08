@@ -1,10 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { 
-  ElButton, 
-  ElDropdown, 
-  ElMenu, 
+import {
+  ElButton,
+  ElDropdown,
+  ElMenu,
   ElMenuItem,
   ElMessage
 } from 'element-plus'
@@ -22,27 +22,27 @@ const route = useRoute()
 const router = useRouter()
 
 // 使用 auth 模块
-const { 
-  user, 
-  error: authError, 
-  loading: authLoading, 
-  register, 
-  login, 
+const {
+  user,
+  error: authError,
+  loading: authLoading,
+  register,
+  login,
   visitorLogin,
-  logout 
+  logout
 } = useAuth()
 
 // 使用chat模块
-const { 
-  conversations, 
-  currentConversation, 
-  messages, 
-  loading: chatLoading, 
+const {
+  conversations,
+  currentConversation,
+  messages,
+  loading: chatLoading,
   error: chatError,
-  createNewChat, 
-  getHistoryCount, 
-  loadHistory, 
-  searchKeywords 
+  createNewChat,
+  getHistoryCount,
+  loadHistory,
+  searchKeywords
 } = useChat(user.value?.username)
 
 // 路由相关计算属性
@@ -51,8 +51,8 @@ const excludePaths = computed(() => [
   '/help',
   '/settings',
   '/about',
+  '/login',
   '/register',
-  '/login'
 ])
 
 // 消息输入
@@ -60,15 +60,23 @@ const message = ref('')
 
 // 处理消息提交
 const handleSubmitMessage = async () => {
-  if (!message.value.trim()) return
-  
+  if (!message.value.trim()) return;
+
   try {
-    await searchKeywords(message.value)
-    message.value = ''
+    let sessionId = currentConversation.value;
+
+    // 未登录用户自动游客登录
+    if (!user.value) {
+      sessionId = await autoVisitorLogin();
+      // 可以在这里初始化游客的会话
+    }
+
+    await searchKeywords(sessionId, message.value);
+    message.value = '';
   } catch (error) {
-    ElMessage.error('发送消息失败: ' + (error.reason || error.message))
+    ElMessage.error('发送消息失败: ' + (error.reason || error.message));
   }
-}
+};
 
 // 导航到登录页面
 const navigateToLogin = () => {
@@ -79,7 +87,9 @@ const navigateToLogin = () => {
 const navigateToRegister = () => {
   router.push('/register')
 }
-
+const navigateToInfo = () => {
+  router.push('/info')
+}
 // 方法：查看历史聊天
 const viewHistory = () => {
   console.log('查看历史聊天')
@@ -119,25 +129,19 @@ const openHelp = () => {
           <el-menu-item index="0">
             <img style="width: 100px" :src="elementPlusLogo" alt="Element logo" />
           </el-menu-item>
-          
+
           <!-- 右上角的注册/登录按钮 -->
           <div v-if="!user" class="login-btn">
-            <el-button 
-              @click="navigateToRegister" 
-              class="register-button"
-              :loading="authLoading"
-            >
+            <el-button @click="navigateToRegister" class="register-button" :loading="authLoading">
               注册
             </el-button>
-            <el-button 
-              @click="navigateToLogin" 
-              class="login-button"
-              :loading="authLoading"
-            >
+
+            <el-button @click="navigateToLogin" class="login-button" :loading="authLoading">
               登录
             </el-button>
-          </div>
 
+
+          </div>
           <!-- 如果已登录，则显示用户信息和设置 -->
           <div v-else class="user-dropdown">
             <el-dropdown>
@@ -146,7 +150,7 @@ const openHelp = () => {
               </el-button>
               <template #dropdown>
                 <el-menu>
-                  <el-menu-item>用户信息</el-menu-item>
+                  <el-menu-item @click="navigateToInfo">用户信息</el-menu-item>
                   <el-menu-item @click="router.push('/settings')">设置</el-menu-item>
                   <el-menu-item @click="logout">退出</el-menu-item>
                 </el-menu>
@@ -158,38 +162,22 @@ const openHelp = () => {
 
       <el-container>
         <el-aside width="230px" class="aside">
-          <el-menu 
-            default-active="2" 
-            class="el-menu-vertical-demo" 
-            :router="true" 
-            mode="vertical"
-          >
+          <el-menu default-active="2" class="el-menu-vertical-demo" :router="true" mode="vertical">
             <!--创建新聊天-->
-            <el-menu-item 
-              index="/chat" 
-              @click="createNewChat"
-              :disabled="!user || chatLoading"
-            >
+            <el-menu-item index="/chat" @click="createNewChat" :disabled="!user || chatLoading">
               <el-icon><icon-menu /></el-icon>
               <span>创建新聊天</span>
             </el-menu-item>
 
             <!--商品筛选-->
-            <el-menu-item 
-              index="/shopping" 
-              @click="filterProducts"
-              :disabled="chatLoading"
-            >
+            <el-menu-item index="/shopping" @click="filterProducts" :disabled="chatLoading">
               <el-icon><icon-menu /></el-icon>
               <span>商品筛选</span>
             </el-menu-item>
 
             <!-- 历史聊天 -->
-            <el-menu-item 
-              index="3" 
-              @click="loadHistory(currentConversation)"
-              :disabled="!user || !currentConversation || chatLoading"
-            >
+            <el-menu-item index="3" @click="loadHistory(currentConversation)"
+              :disabled="!user || !currentConversation || chatLoading">
               <el-icon><icon-menu /></el-icon>
               <span>历史聊天</span>
             </el-menu-item>
@@ -224,21 +212,16 @@ const openHelp = () => {
     <!-- 聊天输入框 -->
     <div v-if="!excludePaths.includes(currentRoute)" class="chat-box">
       <div class="input-wrapper">
-        <img style="width: 100px" src="@/assets/logo.png" alt="logo" class="chat-logo" />
-        <div class="input-label">你好，我是智能购物机</div>
-        <el-input 
-          v-model="message" 
-          placeholder="请输入消息..." 
-          class="message-input"
-          :disabled="!user || chatLoading"
-        ></el-input>
-        <el-button 
-          type="primary" 
-          class="submit-btn" 
-          @click="handleSubmitMessage"
-          :disabled="!message.trim() || !user || chatLoading"
-          :loading="chatLoading"
-        >
+        <div v-if="user" class="user-info">
+          当前用户: {{ user.username }}
+          <el-tag v-if="user.isVisitor" type="info" size="small">游客</el-tag>
+        </div>
+        <div v-else class="user-info">
+          <el-tag type="info">游客模式</el-tag>
+        </div>
+
+        <el-input v-model="message" placeholder="请输入您的问题..." class="message-input"></el-input>
+        <el-button type="primary" class="submit-btn" @click="handleSubmitMessage" :loading="chatLoading">
           ↑
         </el-button>
       </div>
@@ -247,8 +230,11 @@ const openHelp = () => {
 </template>
 
 <style scoped>
-:global(body) {
-  margin: 0;
+.user-info {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* 右上角的登录按钮样式 */

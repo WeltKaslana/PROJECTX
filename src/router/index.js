@@ -5,6 +5,8 @@ import HelpView from '@/views/HelpView.vue'
 import ChatView from '@/views/ChatView.vue'
 import ShoppingView from '@/views/ShoppingView.vue'
 import Settings from '../views/Settings.vue'
+import RegisterView from '../views/RegisterView.vue'
+import LoginView from '../views/LoginView.vue'
 
 // 定义"路由"数组 (即路由记录数组)
 const routes = [
@@ -32,6 +34,16 @@ const routes = [
         path: '/settings',
         name: 'settings',
         component: Settings,
+    },
+    {
+        path: '/login',
+        name: 'login',
+        component: LoginView,
+    },
+    {
+        path:'/register',
+        name:'register',
+        component: RegisterView
     }
 ]
 
