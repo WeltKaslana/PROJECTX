@@ -1,52 +1,83 @@
 <script setup>
-import { ref } from 'vue'
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { ElButton, ElDropdown, ElMenu, ElMenuItem } from 'element-plus'
-import elementPlusLogo from '@/assets/logo.png'
-
-
-// 监听路由变化
-// App.vue 中使用 useRoute 来获取当前路由信息
-// 并使用 computed 来创建一个响应式的 currentRoute 变量
-// 当excludePaths 中的路径与当前路由匹配时，输入框和提交按钮将被隐藏
-const route = useRoute()
-const currentRoute = computed(() => route)
-const excludePaths = computed(() => [
-  '/help',        // 帮助页面
-  '/settings',    // 设置页面
-  '/about',       // 关于页面
-])
-
-
+import { ref, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { 
+  ElButton, 
+  ElDropdown, 
+  ElMenu, 
+  ElMenuItem,
+  ElMessage
+} from 'element-plus'
 import {
   Document,
   Menu as IconMenu,
   Location,
   Setting,
 } from '@element-plus/icons-vue'
-import router from './router'
+import elementPlusLogo from '@/assets/logo.png'
+import { useAuth } from '@/api/auth'
+import { useChat } from '@/api/chat'
 
-const isLoggedIn = ref(false)
-const username = ref('用户名')
+const route = useRoute()
+const router = useRouter()
+
+// 使用 auth 模块
+const { 
+  user, 
+  error: authError, 
+  loading: authLoading, 
+  register, 
+  login, 
+  visitorLogin,
+  logout 
+} = useAuth()
+
+// 使用chat模块
+const { 
+  conversations, 
+  currentConversation, 
+  messages, 
+  loading: chatLoading, 
+  error: chatError,
+  createNewChat, 
+  getHistoryCount, 
+  loadHistory, 
+  searchKeywords 
+} = useChat(user.value?.username)
+
+// 路由相关计算属性
+const currentRoute = computed(() => route.path)
+const excludePaths = computed(() => [
+  '/help',
+  '/settings',
+  '/about',
+  '/register',
+  '/login'
+])
+
+// 消息输入
 const message = ref('')
 
-// 模拟登录
-const login = () => {
-  isLoggedIn.value = true;
-  username.value = '张三'; // 登录后显示用户名
+// 处理消息提交
+const handleSubmitMessage = async () => {
+  if (!message.value.trim()) return
+  
+  try {
+    await searchKeywords(message.value)
+    message.value = ''
+  } catch (error) {
+    ElMessage.error('发送消息失败: ' + (error.reason || error.message))
+  }
 }
 
-// 模拟登出
-const logout = () => {
-  isLoggedIn.value = false;
-  username.value = '';
+// 导航到登录页面
+const navigateToLogin = () => {
+  router.push('/login')
 }
 
-// 方法：创建新聊天
-const createNewChat = () => {
-  console.log('创建新聊天')
-  router.push('/new-chat');
+// 导航到注册页面
+const navigateToRegister = () => {
+  router.push('/register')
 }
 
 // 方法：查看历史聊天
@@ -78,38 +109,45 @@ const openHelp = () => {
   console.log('打开帮助')
   // 逻辑代码可以在这里添加
 }
-
-const submitMessage = () => {
-  console.log('提交消息:', message.value);  // 这里可以替换为提交消息的实际逻辑
-  message.value = '';  // 清空输入框
-}
 </script>
 
 <template>
   <div class="common-layout">
     <el-container>
       <el-header class="header">
-        <!-- 水平导航菜单， 当 router 取值为 true 时表示启用对 VueRouter 的导航支持 -->
         <el-menu mode="horizontal" :ellipsis="false" :router="true" class="nav-menu">
-          <!-- 菜单项 -->
           <el-menu-item index="0">
             <img style="width: 100px" :src="elementPlusLogo" alt="Element logo" />
           </el-menu-item>
+          
           <!-- 右上角的注册/登录按钮 -->
-          <div v-if="!isLoggedIn" class="login-btn">
-            <el-button @click="login" class="login-button">登录</el-button>
+          <div v-if="!user" class="login-btn">
+            <el-button 
+              @click="navigateToRegister" 
+              class="register-button"
+              :loading="authLoading"
+            >
+              注册
+            </el-button>
+            <el-button 
+              @click="navigateToLogin" 
+              class="login-button"
+              :loading="authLoading"
+            >
+              登录
+            </el-button>
           </div>
 
           <!-- 如果已登录，则显示用户信息和设置 -->
           <div v-else class="user-dropdown">
             <el-dropdown>
               <el-button>
-                {{ username }} <i class="el-icon-arrow-down el-icon--right"></i>
+                {{ user.username }} <i class="el-icon-arrow-down el-icon--right"></i>
               </el-button>
               <template #dropdown>
                 <el-menu>
                   <el-menu-item>用户信息</el-menu-item>
-                  <el-menu-item>设置</el-menu-item>
+                  <el-menu-item @click="router.push('/settings')">设置</el-menu-item>
                   <el-menu-item @click="logout">退出</el-menu-item>
                 </el-menu>
               </template>
@@ -120,21 +158,38 @@ const submitMessage = () => {
 
       <el-container>
         <el-aside width="230px" class="aside">
-          <el-menu default-active="2" class="el-menu-vertical-demo" :router="true" mode="vertical">
+          <el-menu 
+            default-active="2" 
+            class="el-menu-vertical-demo" 
+            :router="true" 
+            mode="vertical"
+          >
             <!--创建新聊天-->
-            <el-menu-item index="/chat" @click="createNewChat">
+            <el-menu-item 
+              index="/chat" 
+              @click="createNewChat"
+              :disabled="!user || chatLoading"
+            >
               <el-icon><icon-menu /></el-icon>
               <span>创建新聊天</span>
             </el-menu-item>
 
             <!--商品筛选-->
-            <el-menu-item index="/shopping" @click="filterProducts">
+            <el-menu-item 
+              index="/shopping" 
+              @click="filterProducts"
+              :disabled="chatLoading"
+            >
               <el-icon><icon-menu /></el-icon>
               <span>商品筛选</span>
             </el-menu-item>
 
             <!-- 历史聊天 -->
-            <el-menu-item index="3" @click="viewHistory">
+            <el-menu-item 
+              index="3" 
+              @click="loadHistory(currentConversation)"
+              :disabled="!user || !currentConversation || chatLoading"
+            >
               <el-icon><icon-menu /></el-icon>
               <span>历史聊天</span>
             </el-menu-item>
@@ -142,16 +197,15 @@ const submitMessage = () => {
             <!-- 固定底部 -->
             <div class="bottom-buttons">
               <!-- 用户设置 -->
-              <el-menu-item index="/settings" @click="openSettings">
+              <el-menu-item index="/settings">
                 <el-icon>
                   <Setting />
                 </el-icon>
                 <span>用户设置</span>
-
               </el-menu-item>
 
               <!-- 帮助 -->
-              <el-menu-item index="/help" @click="openHelp">
+              <el-menu-item index="/help">
                 <el-icon>
                   <Location />
                 </el-icon>
@@ -159,21 +213,34 @@ const submitMessage = () => {
               </el-menu-item>
             </div>
           </el-menu>
-
         </el-aside>
+
         <el-main class="main">
           <router-view />
         </el-main>
       </el-container>
     </el-container>
 
-    <!-- 中间的输入框和提交按钮 建议挪到对应的组件里而非App.vue，否则扩展困难-->
-    <div v-if="!excludePaths.includes(currentRoute.path)" class="chat-box">
+    <!-- 聊天输入框 -->
+    <div v-if="!excludePaths.includes(currentRoute)" class="chat-box">
       <div class="input-wrapper">
         <img style="width: 100px" src="@/assets/logo.png" alt="logo" class="chat-logo" />
         <div class="input-label">你好，我是智能购物机</div>
-        <el-input v-model="message" placeholder="请输入消息..." class="message-input"></el-input>
-        <el-button type="primary" class="submit-btn" @click="submitMessage">↑</el-button>
+        <el-input 
+          v-model="message" 
+          placeholder="请输入消息..." 
+          class="message-input"
+          :disabled="!user || chatLoading"
+        ></el-input>
+        <el-button 
+          type="primary" 
+          class="submit-btn" 
+          @click="handleSubmitMessage"
+          :disabled="!message.trim() || !user || chatLoading"
+          :loading="chatLoading"
+        >
+          ↑
+        </el-button>
       </div>
     </div>
   </div>
