@@ -61,6 +61,7 @@ const message = ref('')
 // 处理消息提交
 const handleSubmitMessage = async () => {
   if (!message.value.trim()) return;
+  //
 
   try {
     // 使用正确的函数名 visitorLogin
@@ -163,12 +164,6 @@ const openHelp = () => {
             <el-menu-item index="/chat" @click="createNewChat" :disabled="!user || chatLoading">
               <el-icon><icon-menu /></el-icon>
               <span>创建新聊天</span>
-            </el-menu-item>
-
-            <!--商品筛选-->
-            <el-menu-item index="/shopping" @click="filterProducts" :disabled="chatLoading">
-              <el-icon><icon-menu /></el-icon>
-              <span>商品筛选</span>
             </el-menu-item>
 
             <!-- 历史聊天 -->
