@@ -6,7 +6,7 @@ import logging
 from dao import userDAO
 from models import db
 from spider import result
-from ai import ai_get_history, ai_get_keywords
+from ai import ai_get_history, ai_get_keywords, ai_delete_history
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/user_db?charset=utf8mb4' #mysql+pymysql://用户名:密码@主机/数据库名
@@ -83,6 +83,17 @@ def get__result(session_id, question):
     res = result(keys) #根据关键词爬取网站，结果以json返回
     print(session_id, question)
     return json_response(message="得到结果", result=res)
+
+# 删除历史记录
+@app.route('/delete/<string:session_id>', methods=['GET'], strict_slashes=False)
+def delete(session_id):
+    username, cid = session_id.split("_")
+    if userDAO.check(username, cid):
+        ai_delete_history(session_id)
+        userDAO.delete_history(session_id)
+        return json_response(message="删除成功")
+    else:
+        return json_response(code=500, message="删除失败", reason="无此会话")
 
 # 注册用户
 @app.route('/register/<string:username>/<string:password>', methods=['GET'], strict_slashes=False)

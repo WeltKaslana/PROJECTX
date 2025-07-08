@@ -57,3 +57,6 @@ class userDAO():
         res = History.query.filter_by(username=username).all()
         session_ids = [result.session_id for result in res]
         return session_ids
+    
+    def delete_history(session_id: str):
+        History.query.filter_by(session_id=session_id).delete()
