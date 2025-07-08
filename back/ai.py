@@ -1,11 +1,12 @@
 from pydantic import BaseModel,Field,model_validator
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.output_parsers import PydanticOutputParser
-from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import PromptTemplate
 from langchain_deepseek import ChatDeepSeek
 from langchain_core.messages import BaseMessage
 from langchain_redis import RedisChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory 
+from langchain_core.output_parsers import StrOutputParser # 导⼊字符串输出解析器
 import os
 
 # 使⽤DeepSeek模型
@@ -24,7 +25,7 @@ llm = ChatDeepSeek(
 )
 
 class Project(BaseModel):
-    name: str = Field(..., description="可能想要买的商品的名称，只用一个词描述想要的商品，如果商品有多个，请列出商品名并用|分隔")
+    name: str = Field(..., description="可能想要买的商品的名称，只用一个词描述想要的商品,可以带修饰词描述，如果商品有多个，请列出商品名并用|分隔")
     # description: str = Field(..., description="对于每个想要买的商品的描述，用|分隔")
 
 
@@ -61,6 +62,19 @@ class InMemoryHistory(BaseChatMessageHistory, BaseModel):
         """清空所有消息"""
         self.messages = []
 def ai_get_keywords(session_id:str, question: str):
+    router_chain = (
+        PromptTemplate.from_template("""根据下⾯的⽤户问题，将其分类为`1` 或 `0`,请只回复⼀个词作为答案。如果问题只是关于推荐几个商品，且不涉及商品性价比等的，请回复`1`，否则回复`0`。
+            <question>
+            {question}
+            </question>
+            分类结果：""") | llm | StrOutputParser()
+    )
+    result = router_chain.invoke({"question": question}) # 调用路由链，获取问题类型
+    
+    print("问题类型：", result) # 打印问题类型
+    if int(result) == 0: # 如果问题类型不是关于商品推荐
+        return([], False) # 返回空列表和False
+    
     # 实例化解析器、提示词模板
     parser = PydanticOutputParser(pydantic_object=Project)
     # 注意，提示词模板中需要部分格式化解析器的格式要求format_instructions 
@@ -100,7 +114,7 @@ def ai_get_keywords(session_id:str, question: str):
     redis_history.add_ai_message(ai_message)
     # print("商品名称：",res.name.split("|"))
     # print("商品描述：",res.description.split("|"))
-    return pro
+    return (pro, True)
 
 def ai_delete_history(session_id:str):
     history = RedisChatMessageHistory(
@@ -111,19 +125,19 @@ def ai_delete_history(session_id:str):
 
 
 #test函数
-# def test():
-#     #ai_delete_history("user_1") # 清除历史记录
-#     print("处理请求中。。。")
-#     print(ai_get_keywords("user_1", "我想买个戴在手上的")) # 测试函数
-#     print("按1继续")
-#     if input() == "1":
-#         print("处理请求中。。。")
-#         print(ai_get_keywords("user_1", "推荐的商品太多了，请精简一点，少列举几个商品"))
-#     print("按2继续")
-#     if input() == "2":
-#         print("处理请求中。。。")
-#         print("历史消息：") # 显示当前历史消息
-#         for i in ai_get_history("user_1"):
-#             print("说话对象：", i.type,"交流内容：" , i.content) # 打印每条消息的类型和内容
+def test():
+    ai_delete_history("user_1") # 清除历史记录
+    print("处理请求中。。。")
+    print(ai_get_keywords("user_1", "我想买个戴在手上的")) # 测试函数
+    print("按1继续")
+    if input() == "1":
+        print("处理请求中。。。")
+        print(ai_get_keywords("user_1", "最好是金包银的"))
+    print("按2继续")
+    if input() == "2":
+        print("处理请求中。。。")
+        print("历史消息：") # 显示当前历史消息
+        for i in ai_get_history("user_1"):
+            print("说话对象：", i.type,"交流内容：" , i.content) # 打印每条消息的类型和内容
 
-# test() # 运行测试函数
+test() # 运行测试函数
