@@ -79,8 +79,9 @@ def visitor():
 # 查询结果
 @app.route('/keywords/<string:session_id>/<string:question>', methods=['GET'], strict_slashes=False)
 def get__result(session_id, question):
-    keys = ai_get_keywords(session_id, question) #调用AI获取关键词
-    res = result(keys) #根据关键词爬取网站，结果以json返回
+    keys, flag = ai_get_keywords(session_id, question) #调用AI获取关键词
+    # 根据关键词爬取网站，结果以json返回
+    res = result(keys, flag, session_id, question)
     print(session_id, question)
     return json_response(message="得到结果", result=res)
 
