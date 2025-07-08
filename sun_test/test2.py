@@ -37,7 +37,7 @@ load_dotenv()
 key = os.getenv("SILICONFLOW_API_KEY")
 base = os.getenv("SILICONFLOW_API_BASE")
 llm = ChatDeepSeek(
-    model='deepseek-ai/DeepSeek-R1-0528-Qwen3-8B',
+    model='deepseek-ai/DeepSeek-R1',
     temperature=0,
     api_key=key,
     api_base=base,
@@ -72,7 +72,7 @@ print(store)
  # 第⼆次调⽤链，询问余弦函数的反函数
 # 由于使⽤相同的会话ID "foo"，模型会记住之前的对话历史
 chain_with_history.invoke(
-    {"ability": "math", "question": "余弦函数的反函数是什么？"},
+    {"ability": "math", "question": "之前的对话内容是什么？"},
     config={"configurable": {"session_id": "foo"}},
 )
 print(store)

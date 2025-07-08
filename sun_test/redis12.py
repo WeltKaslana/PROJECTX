@@ -12,10 +12,10 @@ history= RedisChatMessageHistory(
  redis_url= "redis://47.98.143.59:6379",# Redis 连接URL
  session_id="user_1", # 会话ID
 )
-history.clear() # 清空历史记录,
+# history.clear() # 清空历史记录,
 # # 向历史记录中添加消息
-history.add_user_message("你好，AI助⼿")
-history.add_ai_message("你好！我今天能为你提供什么帮助呢？") # 添加AI助⼿的回复
+history.add_user_message("我想买个戴在手上的")
+history.add_ai_message("我认为你可能需要的商品是手链、手表、手环、手镯") # 添加AI助⼿的回复
 # 检索并显示历史消息
 print("历史消息：") # 显示当前历史消息
 for message in history.messages:
