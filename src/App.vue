@@ -1,39 +1,59 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  ElButton,
-  ElDropdown,
-  ElMenu,
-  ElMenuItem,
-  ElMessage
+import { 
+  ElButton, 
+  ElDropdown, 
+  ElMenu, 
+  ElMenuItem, 
+  ElMessage,
+  ElTag
 } from 'element-plus'
 import {
   Document,
   Menu as IconMenu,
   Location,
   Setting,
+  Upload
 } from '@element-plus/icons-vue'
 import elementPlusLogo from '@/assets/logo.png'
 import { useAuth } from '@/api/auth'
 import { useChat } from '@/api/chat'
 
+// ======================
+// 路由相关
+// ======================
 const route = useRoute()
 const router = useRouter()
 
-// 使用 auth 模块
-const {
+// 排除聊天框的路径
+const excludedPaths = [
+  '/help',
+  '/settings',
+  '/about',
+  '/login',
+  '/register'
+]
+const currentRoute = computed(() => route.path)
+const showChatBox = computed(() => !excludedPaths.includes(currentRoute.value))
+
+// ======================
+// 认证模块
+// ======================
+const { 
   user,
   error: authError,
   loading: authLoading,
-  register,
   login,
-  visitorLogin,
-  logout
+  logout,
+  register,
+  visitorLogin
 } = useAuth()
 
-// 使用chat模块
-const {
+// ======================
+// 聊天模块
+// ======================
+const { 
   conversations,
   currentConversation,
   messages,
@@ -45,175 +65,209 @@ const {
   searchKeywords
 } = useChat(user.value?.username)
 
-// 路由相关计算属性
-const currentRoute = computed(() => route.path)
-const excludePaths = computed(() => [
-  '/help',
-  '/settings',
-  '/about',
-  '/login',
-  '/register',
-])
-
-// 消息输入
+// ======================
+// 数据状态
+// ======================
 const message = ref('')
 
-// 处理消息提交
+// ======================
+// 导航方法
+// ======================
+const navigateTo = {
+  login: () => router.push('/login'),
+  register: () => router.push('/register'),
+  info: () => router.push('/info'),
+  settings: () => router.push('/settings')
+}
+
+// ======================
+// 聊天相关方法
+// ======================
 const handleSubmitMessage = async () => {
-  if (!message.value.trim()) return;
-  //
+  if (!message.value.trim()) return
 
   try {
-    // 使用正确的函数名 visitorLogin
+    // 未登录用户自动游客登录
     if (!user.value) {
-      await visitorLogin();
+      await visitorLogin()
+      // 游客登录后创建新会话
+      await createNewChat()
     }
-    await searchKeywords(currentConversation.value, message.value);
-    message.value = '';
+    
+    await searchKeywords(currentConversation.value, message.value)
+    message.value = ''
   } catch (error) {
-    ElMessage.error('发送消息失败: ' + (error.reason || error.message));
+    showError('发送消息失败', error)
   }
-};
-
-// 导航到登录页面
-const navigateToLogin = () => {
-  router.push('/login')
 }
 
-// 导航到注册页面
-const navigateToRegister = () => {
-  router.push('/register')
-}
-const navigateToInfo = () => {
-  router.push('/info')
-}
-// 方法：查看历史聊天
-const viewHistory = () => {
-  console.log('查看历史聊天')
-  // 逻辑代码可以在这里添加
+// ======================
+// 辅助方法
+// ======================
+const showError = (message, error) => {
+  const reason = error.reason || error.message || '未知错误'
+  ElMessage.error(`${message}: ${reason}`)
 }
 
-// 方法：筛选商品
-const filterProducts = () => {
-  console.log('筛选商品')
-  // 逻辑代码可以在这里添加
-}
-
-// 方法：设置价格提醒
-const setPriceAlert = () => {
-  console.log('设置价格提醒')
-  // 逻辑代码可以在这里添加
-}
-
-// 方法：打开用户设置
-const openSettings = () => {
-  console.log('打开设置')
-  // 逻辑代码可以在这里添加
-}
-
-// 方法：打开帮助
-const openHelp = () => {
-  console.log('打开帮助')
-  // 逻辑代码可以在这里添加
+// 占位方法（待实现功能）
+const placeholderMethod = (name) => {
+  console.log(`${name}功能待实现`)
 }
 </script>
 
 <template>
   <div class="common-layout">
+    <!-- 顶部导航栏 -->
     <el-container>
       <el-header class="header">
-        <el-menu mode="horizontal" :ellipsis="false" :router="true" class="nav-menu">
+        <el-menu 
+          mode="horizontal" 
+          :ellipsis="false" 
+          :router="true" 
+          class="nav-menu"
+        >
+          <!-- 应用logo -->
           <el-menu-item index="0">
-            <img style="width: 100px" :src="elementPlusLogo" alt="Element logo" />
+            <img 
+              style="width: 100px" 
+              :src="elementPlusLogo" 
+              alt="应用Logo" 
+            />
           </el-menu-item>
 
-          <!-- 右上角的注册/登录按钮 -->
-          <div v-if="!user" class="login-btn">
-            <el-button @click="navigateToRegister" class="register-button" :loading="authLoading">
-              注册
-            </el-button>
-
-            <el-button @click="navigateToLogin" class="login-button" :loading="authLoading">
-              登录
-            </el-button>
-
-
-          </div>
-          <!-- 如果已登录，则显示用户信息和设置 -->
-          <div v-else class="user-dropdown">
-            <el-dropdown>
-              <el-button>
-                {{ user.username }} <i class="el-icon-arrow-down el-icon--right"></i>
+          <!-- 用户状态区域 -->
+          <div class="user-state">
+            <!-- 未登录状态 -->
+            <div v-if="!user" class="auth-buttons">
+              <el-button 
+                @click="navigateTo.register" 
+                class="auth-button register"
+                :loading="authLoading"
+              >
+                注册
               </el-button>
-              <template #dropdown>
-                <el-menu>
-                  <el-menu-item @click="navigateToInfo">用户信息</el-menu-item>
-                  <el-menu-item @click="router.push('/settings')">设置</el-menu-item>
-                  <el-menu-item @click="logout">退出</el-menu-item>
-                </el-menu>
-              </template>
-            </el-dropdown>
+              <el-button 
+                @click="navigateTo.login" 
+                class="auth-button login"
+                :loading="authLoading"
+              >
+                登录
+              </el-button>
+            </div>
+
+            <!-- 已登录状态 -->
+            <div v-else class="user-profile">
+              <el-dropdown>
+                <el-button class="profile-button">
+                  {{ user.username }} 
+                  <i class="el-icon-arrow-down el-icon--right"></i>
+                </el-button>
+                <template #dropdown>
+                  <el-menu>
+                    <el-menu-item @click="navigateTo.info">
+                      用户信息
+                    </el-menu-item>
+                    <el-menu-item @click="navigateTo.settings">
+                      设置
+                    </el-menu-item>
+                    <el-menu-item @click="logout">
+                      退出
+                    </el-menu-item>
+                  </el-menu>
+                </template>
+              </el-dropdown>
+            </div>
           </div>
         </el-menu>
       </el-header>
 
+      <!-- 主体内容区域 -->
       <el-container>
-        <el-aside width="230px" class="aside">
-          <el-menu default-active="2" class="el-menu-vertical-demo" :router="true" mode="vertical">
-            <!--创建新聊天-->
-            <el-menu-item index="/chat" @click="createNewChat" :disabled="!user || chatLoading">
+        <!-- 侧边栏导航 -->
+        <el-aside width="230px" class="sidebar">
+          <el-menu 
+            default-active="2" 
+            class="vertical-menu" 
+            :router="true" 
+            mode="vertical"
+          >
+            <!-- 聊天功能 -->
+            <el-menu-item 
+              index="/chat" 
+              @click="createNewChat"
+              :disabled="chatLoading"
+            >
               <el-icon><icon-menu /></el-icon>
               <span>创建新聊天</span>
             </el-menu-item>
 
-            <!-- 历史聊天 -->
-            <el-menu-item index="3" @click="loadHistory(currentConversation)"
-              :disabled="!user || !currentConversation || chatLoading">
+            <!-- 历史记录 -->
+            <el-menu-item 
+              index="3" 
+              @click="loadHistory(currentConversation)"
+              :disabled="!currentConversation || chatLoading"
+            >
               <el-icon><icon-menu /></el-icon>
               <span>历史聊天</span>
             </el-menu-item>
 
-            <!-- 固定底部 -->
-            <div class="bottom-buttons">
-              <!-- 用户设置 -->
+            <!-- 底部固定菜单 -->
+            <div class="menu-footer">
               <el-menu-item index="/settings">
-                <el-icon>
-                  <Setting />
-                </el-icon>
+                <el-icon><Setting /></el-icon>
                 <span>用户设置</span>
               </el-menu-item>
-
-              <!-- 帮助 -->
               <el-menu-item index="/help">
-                <el-icon>
-                  <Location />
-                </el-icon>
+                <el-icon><Location /></el-icon>
                 <span>帮助页面</span>
               </el-menu-item>
             </div>
           </el-menu>
         </el-aside>
 
-        <el-main class="main">
+        <!-- 主内容区 -->
+        <el-main class="main-content">
           <router-view />
         </el-main>
       </el-container>
     </el-container>
 
     <!-- 聊天输入框 -->
-    <div v-if="!excludePaths.includes(currentRoute)" class="chat-box">
-      <div class="input-wrapper">
-        <div v-if="user" class="user-info">
-          当前用户: {{ user.username }}
-          <el-tag v-if="user.isVisitor" type="info" size="small">游客</el-tag>
-        </div>
-        <div v-else class="user-info">
-          <el-tag type="info">游客模式</el-tag>
+    <div v-if="showChatBox" class="chat-box">
+      <div class="input-container">
+        <!-- 用户状态显示 -->
+        <div class="user-status">
+          <template v-if="user">
+            当前用户: {{ user.username }}
+            <el-tag 
+              v-if="user.isVisitor" 
+              type="info" 
+              size="small"
+            >
+              游客
+            </el-tag>
+          </template>
+          <el-tag v-else type="info">
+            游客模式 (消息将自动以游客身份发送)
+          </el-tag>
         </div>
 
-        <el-input v-model="message" placeholder="请输入您的问题..." class="message-input"></el-input>
-        <el-button type="primary" class="submit-btn" @click="handleSubmitMessage" :loading="chatLoading">
-          ↑
+        <!-- 消息输入区域 -->
+        <el-input 
+          v-model="message" 
+          placeholder="请输入您的问题..." 
+          class="message-input"
+          type="textarea"
+          :rows="4"
+        />
+        <el-button 
+          type="primary" 
+          class="send-button" 
+          @click="handleSubmitMessage"
+          :disabled="!message.trim() || chatLoading"
+          :loading="chatLoading"
+        >
+          <el-icon><Upload /></el-icon>
         </el-button>
       </div>
     </div>
@@ -221,126 +275,119 @@ const openHelp = () => {
 </template>
 
 <style scoped>
-.user-info {
+/* 布局样式 */
+.common-layout {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 0;
+  height: 65px;
+}
+
+.sidebar {
+  height: calc(100vh - 65px);
+  margin-top: 20px;
+}
+
+.main-content {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+/* 导航菜单样式 */
+.nav-menu {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.user-state {
+  margin-left: auto;
+}
+
+.auth-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+/* 按钮样式 */
+.auth-button {
+  &.login {
+    background-color: black;
+    color: white;
+    border-color: black;
+
+    &:hover {
+      background-color: #666;
+      border-color: #666;
+    }
+  }
+
+  &.register {
+    background-color: white;
+    color: black;
+    border-color: #dcdfe6;
+
+    &:hover {
+      background-color: #f5f7fa;
+    }
+  }
+}
+
+.profile-button {
+  padding: 8px 15px;
+}
+
+/* 侧边栏样式 */
+.vertical-menu {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-footer {
+  margin-top: auto;
+  padding-bottom: 20px;
+}
+
+/* 聊天框样式 */
+.chat-box {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  max-width: 900px;
+  padding: 20px;
+  background: white;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+.input-container {
+  position: relative;
+}
+
+.user-status {
   margin-bottom: 10px;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* 右上角的登录按钮样式 */
-.login-btn {
-  float: right;
-  display: flex;
-  justify-content: center;
-  /* 水平居中 */
-  align-items: center;
-  /* 垂直居中 */
-  margin-top: 5px;
-  /* 调整按钮与顶部的距离 */
-  margin-right: 5px;
-  /* 确保按钮靠右 */
-}
-
-/* 修改登录按钮样式：黑色背景，白色字体 */
-.login-button {
-  background-color: black;
-  color: white;
-  border-color: black;
-}
-
-.login-button:hover {
-  background-color: #666;
-  color: white;
-  border-color: #666;
-}
-
-.aside {
-  height: 90vh;
-  margin-top: 20px;
-  display: flex;
-  flex-direction: column;
-}
-
-.el-menu-vertical-demo {
-  flex-grow: 1;
-  overflow-y: auto;
-}
-
-.bottom-buttons {
-  margin-top: 300px;
-  /* 固定底部 */
-  padding: 1px;
-}
-
-.el-menu-item {
-  display: flex;
-  align-items: center;
-  padding-left: 20px;
-  font-size: 16px;
-  color: #333;
-}
-
-.el-menu-item:hover {
-  background-color: #ddd;
-}
-
-.el-menu--horizontal {
-  --el-menu-horizontal-height: 65px;
-}
-
-.el-menu--horizontal>.el-menu-item:nth-child(1) {
-  margin-right: auto;
-}
-
-.input-label {
-  font-size: 30px;
-  color: black;
-  margin-bottom: 30px;
-  text-align: center;
-  font-weight: bold;
-}
-
-.chat-box {
-  position: absolute;
-  top: 75%;
-  /* 垂直居中 */
-  left: 50%;
-  /* 水平居中 */
-  transform: translate(-40%, -50%);
-  width: 900px;
-}
-
-.input-wrapper {
-  text-align: center;
-}
-
 .message-input {
-  vertical-align: top;
-  width: 100%;
-  height: 200px;
-  margin-bottom: 10px;
-  font-size: 20px;
+  font-size: 16px;
 }
 
-.submit-btn {
+.send-button {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
   width: 40px;
   height: 40px;
-  border-radius: 100%;
-  /* 使按钮变圆 */
-  position: absolute;
-  bottom: 20px;
-  /* 按钮位置靠近文本框右下角 */
-  right: 15px;
-  /* 放置到右下角 */
-  padding: 0;
-  font-size: 20px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: black;
-  color: white;
-  border-color: black;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
 }
 </style>
