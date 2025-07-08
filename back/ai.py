@@ -95,6 +95,12 @@ def ai_get_keywords(session_id:str, question: str):
     # print("商品名称：",res.name.split("|"))
     # print("商品描述：",res.description.split("|"))
     return res
+def ai_delete_history(session_id:str):
+    history = RedisChatMessageHistory(
+        redis_url = "redis://47.98.143.59:6379",# Redis 连接URL
+        session_id = session_id, # 会话ID
+    )
+    history.clear()  # 清除聊天历史
 
 # test
 # for i in ai_get_history("user_1"):
