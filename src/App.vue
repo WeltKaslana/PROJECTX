@@ -63,15 +63,11 @@ const handleSubmitMessage = async () => {
   if (!message.value.trim()) return;
 
   try {
-    let sessionId = currentConversation.value;
-
-    // 未登录用户自动游客登录
+    // 使用正确的函数名 visitorLogin
     if (!user.value) {
-      sessionId = await autoVisitorLogin();
-      // 可以在这里初始化游客的会话
+      await visitorLogin();
     }
-
-    await searchKeywords(sessionId, message.value);
+    await searchKeywords(currentConversation.value, message.value);
     message.value = '';
   } catch (error) {
     ElMessage.error('发送消息失败: ' + (error.reason || error.message));

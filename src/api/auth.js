@@ -5,19 +5,7 @@ const user = ref(null);  // 这行是修复关键
 const error = ref(null);
 const loading = ref(false);
 export const useAuth = () => {
-    const autoVisitorLogin = async () => {
-        try {
-            const response = await api.visitorLogin();
-            user.value = {
-                username: `visitor${response.result[0]}`,
-                isVisitor: true  // 标记为游客
-            };
-            return response.result[1]; // 返回会话ID
-        } catch (err) {
-            error.value = '自动游客登录失败';
-            throw err;
-        }
-    };
+ 
     // 验证用户名和密码不能是纯数字
     const validateCredentials = (username, password) => {
         const isAllNumbers = (str) => /^\d+$/.test(str);
@@ -99,6 +87,5 @@ export const useAuth = () => {
         login,
         visitorLogin,
         logout,
-        autoVisitorLogin
     };
 };
