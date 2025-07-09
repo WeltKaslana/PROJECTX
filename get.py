@@ -50,4 +50,4 @@ def send_post(url: str, data: dict = None, json: dict = None) -> None:
 # 示例调用
 if __name__ == "__main__":
     # 发送 GET 请求示例
-    send_get("http://localhost:8080/")
+    send_get("http://localhost:8080/login/abc/ahskdshaw")

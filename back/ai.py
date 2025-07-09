@@ -125,19 +125,19 @@ def ai_delete_history(session_id:str):
 
 
 #test函数
-def test():
-    ai_delete_history("user_1") # 清除历史记录
-    print("处理请求中。。。")
-    print(ai_get_keywords("user_1", "我想买个戴在手上的")) # 测试函数
-    print("按1继续")
-    if input() == "1":
-        print("处理请求中。。。")
-        print(ai_get_keywords("user_1", "最好是金包银的"))
-    print("按2继续")
-    if input() == "2":
-        print("处理请求中。。。")
-        print("历史消息：") # 显示当前历史消息
-        for i in ai_get_history("user_1"):
-            print("说话对象：", i.type,"交流内容：" , i.content) # 打印每条消息的类型和内容
+# def test():
+#     ai_delete_history("user_1") # 清除历史记录
+#     print("处理请求中。。。")
+#     print(ai_get_keywords("user_1", "我想买个戴在手上的")) # 测试函数
+#     print("按1继续")
+#     if input() == "1":
+#         print("处理请求中。。。")
+#         print(ai_get_keywords("user_1", "最好是金包银的"))
+#     print("按2继续")
+#     if input() == "2":
+#         print("处理请求中。。。")
+#         print("历史消息：") # 显示当前历史消息
+#         for i in ai_get_history("user_1"):
+#             print("说话对象：", i.type,"交流内容：" , i.content) # 打印每条消息的类型和内容
 
-test() # 运行测试函数
+# test() # 运行测试函数

@@ -9,7 +9,9 @@ from spider import result
 from ai import ai_get_history, ai_get_keywords, ai_delete_history
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/user_db?charset=utf8mb4' #mysql+pymysql://用户名:密码@主机/数据库名
+
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/user_db?charset=utf8mb4' #mysql+pymysql://用户名:密码@主机/数据库名
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:abc123456@47.98.143.59/user_db?charset=utf8mb4'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JSON_AS_ASCII'] = False
 
@@ -110,6 +112,7 @@ def register(username, password):
 # 登录
 @app.route('/login/<string:username>/<string:password>', methods=['GET'], strict_slashes=False)
 def login(username, password):
+    print(username, password)
     if userDAO.checklog(username, password):
         return json_response(message="登录成功")
     else:
@@ -134,5 +137,5 @@ if __name__ == '__main__':
     except Exception as e:
         app.logger.error(f'Error creating database tables: {e}')
 
-    serve(app, host='0.0.0.0', port=8080)
+    serve(app, host='0.0.0.0', port=8080, threads=4)
     
