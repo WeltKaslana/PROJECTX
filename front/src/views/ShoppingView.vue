@@ -25,7 +25,7 @@
                         <div class="product-price">
                             <span class="current-price">¥{{ product.price }}</span>
                             <span v-if="product.originalPrice" class="original-price">¥{{ product.originalPrice
-                                }}</span>
+                            }}</span>
                         </div>
                     </div>
                 </div>

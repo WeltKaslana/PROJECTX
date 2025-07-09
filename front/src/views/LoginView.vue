@@ -1,4 +1,5 @@
 <template>
+  <!-- 模板部分保持不变 -->
   <div class="login-page">
     <el-card class="login-card">
       <h2 class="login-title">用户登录</h2>
@@ -32,7 +33,7 @@ import { ElMessage } from 'element-plus';
 import { useAuth } from '@/api/auth';
 
 const router = useRouter();
-const { login, loading } = useAuth();
+const { login, loading, error } = useAuth();
 const loginFormRef = ref(null);
 
 const form = ref({
@@ -40,7 +41,7 @@ const form = ref({
   password: ''
 });
 
-// 增强的验证规则
+// 验证规则保持不变
 const rules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
@@ -74,39 +75,36 @@ const rules = {
 
 const handleSubmit = async () => {
   try {
-    // 先进行表单验证
     await loginFormRef.value.validate();
+    loading.value = true;
 
-    loading.value = true;  // 添加加载状态
-    const response = await login(form.value.username, form.value.password);
+    const result = await login(form.value.username, form.value.password);
 
-    // 根据后端响应处理
-    if (response.code === 200) {
-      ElMessage.success(response.message || '登录成功');
+    // 登录成功处理
+    if (result.code === 200) {
+      ElMessage.success(result.message || '登录成功');
       router.push('/');
-    } else {
-      // 使用后端返回的reason或message
-      ElMessage.error(response.reason || response.message || '登录失败');
     }
   } catch (err) {
-    // 统一错误处理
-    ElMessage.error(
-      err.response?.data?.reason ||
-      err.response?.data?.message ||
-      err.message ||
-      '登录失败'
-    );
+    // 错误处理
+    const errorMsg = err.reason || err.message || '登录失败';
+    ElMessage.error(errorMsg);
+    console.error('登录错误详情:', {
+      message: err.message,
+      reason: err.reason,
+      fullError: err
+    });
   } finally {
     loading.value = false;
   }
 };
-
 const navigateToRegister = () => {
   router.push('/register');
 };
 </script>
 
 <style scoped>
+/* 样式部分保持不变 */
 .login-page {
   display: flex;
   justify-content: center;

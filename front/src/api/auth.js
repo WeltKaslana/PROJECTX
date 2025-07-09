@@ -34,10 +34,10 @@ export const useAuth = () => {
 
     // 处理API响应错误
     const handleApiError = (err) => {
-        // 优先使用后端返回的reason，其次使用message，最后使用默认错误
+        // 现在err已经是后端返回的完整响应数据
         const errorMessage = err.reason || err.message || '操作失败';
         error.value = errorMessage;
-        throw new Error(errorMessage);
+        throw err; // 抛出完整错误对象，以便调用处可以访问所有字段
     };
 
     const register = async (username, password) => {
@@ -45,7 +45,7 @@ export const useAuth = () => {
         error.value = null;
         try {
             validateCredentials(username, password);
-            
+
             const response = await api.register(username, password);
             if (response.code === 200) {
                 user.value = { username };
@@ -67,11 +67,16 @@ export const useAuth = () => {
             validateCredentials(username, password);
 
             const response = await api.login(username, password);
+            // 现在response已经是后端返回的数据对象
             if (response.code === 200) {
                 user.value = { username };
                 return response;
             } else {
-                handleApiError(response);
+                // 登录失败，抛出错误信息
+                throw {
+                    message: response.message,
+                    reason: response.reason
+                };
             }
         } catch (err) {
             handleApiError(err);
@@ -106,5 +111,6 @@ export const useAuth = () => {
         login,
         visitorLogin,
         logout,
+        register
     };
 };

@@ -5,16 +5,23 @@ const api = axios.create({
   timeout: 5000
 });
 
-// 统一处理响应
+// 优化后的响应拦截器
 api.interceptors.response.use(
   response => {
-    if (response.data && response.data.code === 200) {
-      return response.data;
-    }
-    return Promise.reject(response.data);
+    // 直接返回response.data，保持与后端一致的结构
+    return response.data;
   },
   error => {
-    return Promise.reject(error);
+    // 如果有响应数据，则返回它
+    if (error.response && error.response.data) {
+      return Promise.reject(error.response.data);
+    }
+    // 如果是网络错误等没有response的情况
+    return Promise.reject({
+      code: error.code || 500,
+      message: error.message || '网络错误',
+      reason: '请求失败，请检查网络连接'
+    });
   }
 );
 

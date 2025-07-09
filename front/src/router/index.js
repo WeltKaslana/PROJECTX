@@ -7,6 +7,7 @@ import ShoppingView from '@/views/ShoppingView.vue'
 import Settings from '../views/Settings.vue'
 import RegisterView from '../views/RegisterView.vue'
 import LoginView from '../views/LoginView.vue'
+import Testview from '../views/testview.vue'
 
 // 定义"路由"数组 (即路由记录数组)
 const routes = [
@@ -44,7 +45,13 @@ const routes = [
         path:'/register',
         name:'register',
         component: RegisterView
-    }
+    },
+    {
+        path: '/test',
+        name: 'test',
+        component: Testview, 
+    },
+
 ]
 
 // 创建"路由器"
