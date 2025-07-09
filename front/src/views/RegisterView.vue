@@ -121,12 +121,24 @@ const handleSubmit = async () => {
   try {
     const valid = await registerFormRef.value.validate();
     if (valid) {
-      await register(form.value.username, form.value.password);
-      ElMessage.success('注册成功');
-      router.push('/login'); // 注册成功后跳转到登录页
+      const response = await register(form.value.username, form.value.password);
+      // 根据后端响应处理
+      if (response.code === 200) {
+        ElMessage.success(response.message || '注册成功');
+        router.push('/');
+      } else {
+        // 使用后端返回的reason或message
+        ElMessage.error(response.reason || response.message || '注册失败');
+      }
     }
   } catch (err) {
-    console.error('注册失败:', err);
+    // 统一错误处理
+    ElMessage.error(
+      err.response?.data?.reason ||
+      err.response?.data?.message ||
+      err.message ||
+      '注册失败'
+    );
   }
 };
 

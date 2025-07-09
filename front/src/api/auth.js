@@ -1,11 +1,12 @@
+// auth.js
 import { ref } from 'vue';
 import api from './api';
-const user = ref(null);  // 这行是修复关键
 
+const user = ref(null);
 const error = ref(null);
 const loading = ref(false);
+
 export const useAuth = () => {
- 
     // 验证用户名和密码不能是纯数字
     const validateCredentials = (username, password) => {
         const isAllNumbers = (str) => /^\d+$/.test(str);
@@ -18,7 +19,6 @@ export const useAuth = () => {
             throw new Error('密码不能是纯数字');
         }
 
-        // 可以添加更多验证规则
         if (username.length < 3) {
             throw new Error('用户名至少需要3个字符');
         }
@@ -32,19 +32,29 @@ export const useAuth = () => {
         user.value = null;
     };
 
+    // 处理API响应错误
+    const handleApiError = (err) => {
+        // 优先使用后端返回的reason，其次使用message，最后使用默认错误
+        const errorMessage = err.reason || err.message || '操作失败';
+        error.value = errorMessage;
+        throw new Error(errorMessage);
+    };
+
     const register = async (username, password) => {
         loading.value = true;
         error.value = null;
         try {
-            // 先验证输入
             validateCredentials(username, password);
-
+            
             const response = await api.register(username, password);
-            user.value = { username };
-            return response;
+            if (response.code === 200) {
+                user.value = { username };
+                return response;
+            } else {
+                handleApiError(response);
+            }
         } catch (err) {
-            error.value = err.message || err.reason || '注册失败';
-            throw err;
+            handleApiError(err);
         } finally {
             loading.value = false;
         }
@@ -54,15 +64,17 @@ export const useAuth = () => {
         loading.value = true;
         error.value = null;
         try {
-            // 登录时也验证输入
             validateCredentials(username, password);
 
             const response = await api.login(username, password);
-            user.value = { username };
-            return response;
+            if (response.code === 200) {
+                user.value = { username };
+                return response;
+            } else {
+                handleApiError(response);
+            }
         } catch (err) {
-            error.value = err.message || err.reason || '登录失败';
-            throw err;
+            handleApiError(err);
         } finally {
             loading.value = false;
         }
@@ -70,10 +82,17 @@ export const useAuth = () => {
 
     const visitorLogin = async () => {
         loading.value = true;
+        error.value = null;
         try {
             const response = await api.visitorLogin();
-            user.value = { username: `visitor${response.result[0]}` };
-            return response;
+            if (response.code === 200) {
+                user.value = { username: `visitor${response.result}` };
+                return response;
+            } else {
+                handleApiError(response);
+            }
+        } catch (err) {
+            handleApiError(err);
         } finally {
             loading.value = false;
         }

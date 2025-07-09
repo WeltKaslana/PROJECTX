@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8080', // 后端API地址
+  baseURL: 'http://172.20.10.8:8080', // 后端API地址
   timeout: 5000
 });
 
