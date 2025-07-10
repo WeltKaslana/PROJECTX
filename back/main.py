@@ -158,6 +158,7 @@ def new(username):
 def main_test():
     print('test')
     test()
+    return json_response(message="test")
 
 if __name__ == '__main__':
     # app.run(debug=True)
