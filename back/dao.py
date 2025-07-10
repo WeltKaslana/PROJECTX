@@ -1,19 +1,27 @@
 from models import db, User, History
 import random
 
+def check_re(username: str):
+    import re
+    pattern = r'^[a-zA-Z0-9-]+$'
+    if re.match(pattern, username) and not username.startswith('visitor'):
+        return True
+    else:
+        return False
+        
 class userDAO():
-
+    
     @staticmethod 
     # 检查用户名是否已存在, 检查用户名只能包含字母数字和符号-
+    # 若用户不存在则返回True
     # 返回bool
     def check_username(username: str):
-        import re
-        pattern = r'^[a-zA-Z0-9-]+$'
-        if not re.match(pattern, username) or username.startswith('visitor'):
+        if check_re(username):
+            user = User.query.filter_by(username=username).first()
+            return user is None
+        else:
             return False
-        user = User.query.filter_by(username=username).first()
-        return user is None
-
+    
     @staticmethod # 查询是否有这个用户名和会话id，返回bool
     def check(username: str, cid: str):
         history = History.query.filter_by(username=username, conversation_id=cid).first()

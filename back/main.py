@@ -1,4 +1,5 @@
 from flask import Flask, request, Response
+from flask_cors import CORS
 from waitress import serve
 import json
 import logging
@@ -9,6 +10,7 @@ from spider import result
 from ai import ai_get_history, ai_get_keywords, ai_delete_history
 
 app = Flask(__name__)
+CORS(app)
 
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/user_db?charset=utf8mb4' #mysql+pymysql://用户名:密码@主机/数据库名
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:abc123456@47.98.143.59/user_db?charset=utf8mb4'
@@ -55,7 +57,8 @@ def json_response(code=200, message="操作成功", result=None, reason=None):
 def get_history_count(username):
     if not userDAO.check_username(username):
         res = userDAO.get_history_count(username)
-        print(res)
+        print('-'*50)
+        print(f'查询到{username}的历史会话：{res}')
         return json_response(message="查询成功",result=res)
     else:
         return json_response(code=404, message="查询失败",reason="用户不存在")
@@ -74,8 +77,9 @@ def get__history(session_id):
 @app.route('/visitor', methods=['GET'], strict_slashes=False)
 def visitor():
     nn = userDAO.visitoradd()
-    nc = userDAO.newc(f'visitor{nn}')
-    print(nn,nc)
+    nc = userDAO.newc(nn)
+    print('-'*50)
+    print(f'游客{nn}登录成功，会话ID为：{nc}')
     return json_response(message="游客登录成功", result=[nn, nc])
 
 # 查询结果
@@ -84,7 +88,8 @@ def get__result(session_id, question):
     keys, flag = ai_get_keywords(session_id, question) #调用AI获取关键词
     # 根据关键词爬取网站，结果以json返回
     res = result(keys, flag, session_id, question)
-    print(session_id, question)
+    print('-'*50)
+    print(f'收到会话{session_id}的问题{question}')
     return json_response(message="得到结果", result=res)
 
 # 删除历史记录
@@ -94,6 +99,8 @@ def delete(session_id):
     if userDAO.check(username, cid):
         ai_delete_history(session_id)
         userDAO.delete_history(session_id)
+        print('-'*50)
+        print(f'删除了会话{session_id}')
         return json_response(message="删除成功")
     else:
         return json_response(code=500, message="删除失败", reason="无此会话")
@@ -101,7 +108,8 @@ def delete(session_id):
 # 注册用户
 @app.route('/register/<string:username>/<string:password>', methods=['GET'], strict_slashes=False)
 def register(username, password):
-    print(username, password)
+    print('-'*50)
+    print(f'注册用户{username}, 密码{password}')
     if userDAO.check_username(username):
         userDAO.add_user(username, password)
         return json_response(message="注册成功")
@@ -112,7 +120,8 @@ def register(username, password):
 # 登录
 @app.route('/login/<string:username>/<string:password>', methods=['GET'], strict_slashes=False)
 def login(username, password):
-    print(username, password)
+    print('-'*50)
+    print(f'用户{username}登录, 密码{password}')
     if userDAO.checklog(username, password):
         return json_response(message="登录成功")
     else:
@@ -122,10 +131,14 @@ def login(username, password):
 # 新对话
 @app.route('/new/<string:username>', methods=['GET'], strict_slashes=False)
 def new(username):
+    print(username)
     if not userDAO.check_username(username):
-        return json_response(message="创建成功", result=userDAO.newc(username))
+        nc = userDAO.newc(username)
+        print('-'*50)
+        print(f'用户{username}创建了新会话{nc}')
+        return json_response(message="创建成功", result=nc)
     else:
-        return json_response(code=500, message="新对话失败", reason="用户不存在")
+        return json_response(code=500, message="新对话创建失败", reason="用户不存在")
 
 if __name__ == '__main__':
     # app.run(debug=True)
