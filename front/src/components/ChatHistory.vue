@@ -22,8 +22,21 @@
         <!-- 商品卡片展示区域 -->
         <div v-if="msg.products && msg.products.length" class="products-container">
           <div class="products-grid">
-            <ProductCard v-for="(product, pIndex) in msg.products" :key="`product-${pIndex}`"
-              :product="product" />
+            <ProductCard 
+              v-for="(product, pIndex) in getVisibleProducts(msg.products, index)" 
+              :key="`product-${pIndex}`"
+              :product="product" 
+            />
+          </div>
+          <div class="load-more-container" v-if="hasMoreProducts(msg.products, index)">
+            <el-button 
+              type="primary" 
+              size="small" 
+              @click="loadMoreProducts(index)"
+              :loading="loadingMore[index]"
+            >
+              加载更多
+            </el-button>
           </div>
         </div>
       </div>
@@ -80,8 +93,34 @@ const props = defineProps({
   }
 })
 
-const emits = defineEmits(['quickQuestion'])
 
+const emits = defineEmits(['quickQuestion'])
+// 每批加载的产品数量
+const BATCH_SIZE = 16 // 4行×4个
+const visibleCounts = ref({}) // 记录每条消息显示的产品数量
+const loadingMore = ref({}) // 记录每条消息的加载状态
+
+// 获取当前可见的产品
+const getVisibleProducts = (products, msgIndex) => {
+  const count = visibleCounts.value[msgIndex] || BATCH_SIZE
+  return products.slice(0, count)
+}
+
+// 检查是否有更多产品可加载
+const hasMoreProducts = (products, msgIndex) => {
+  const count = visibleCounts.value[msgIndex] || BATCH_SIZE
+  return products.length > count
+}
+
+// 加载更多产品
+const loadMoreProducts = (msgIndex) => {
+  loadingMore.value[msgIndex] = true
+  // 模拟异步加载
+  setTimeout(() => {
+    visibleCounts.value[msgIndex] = (visibleCounts.value[msgIndex] || BATCH_SIZE) + BATCH_SIZE
+    loadingMore.value[msgIndex] = false
+  }, 500)
+}
 const handleQuickQuestion = (question) => emits('quickQuestion', question)
 </script>
 
@@ -242,6 +281,33 @@ const handleQuickQuestion = (question) => emits('quickQuestion', question)
   padding: 10px;
   color: #666;
   font-size: 0.9em;
+}
+/* 新增样式 */
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+  padding: 10px 0;
+}
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  padding: 10px 0;
+}
+
+@media (max-width: 768px) {
+  .products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
 }
 </style>
   

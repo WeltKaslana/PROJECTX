@@ -1,3 +1,57 @@
+<template>
+  <el-card 
+    class="product-card" 
+    :body-style="{ padding: '0px' }" 
+    shadow="hover"
+    @click.stop="openProductLink"
+  >
+    <div class="image-container">
+      <el-image 
+        :src="product.image" 
+        fit="cover" 
+        class="product-image" 
+        :alt="product.name"
+        lazy
+      >
+        <template #error>
+          <div class="image-error">
+            <el-icon><Picture /></el-icon>
+            <span>图片加载失败</span>
+          </div>
+        </template>
+        <template #placeholder>
+          <div class="image-loading">
+            <el-icon><Loading /></el-icon>
+          </div>
+        </template>
+      </el-image>
+      <div class="product-badge" v-if="product.isPostFree">
+        包邮
+      </div>
+    </div>
+    <div class="product-info">
+      <div class="product-name" :title="product.name">
+        {{ product.name }}
+      </div>
+      
+      <div class="product-meta">
+        <div class="product-shop" @click.stop="openShopLink">
+          <el-icon><Shop /></el-icon>
+          <span class="shop-name">{{ product.shop }}</span>
+          <span class="location" v-if="product.location">
+            {{ product.location }}
+          </span>
+        </div>
+        
+        <div class="product-price">
+          <span class="current-price">¥{{ product.price }}</span>
+          <span class="sales">销量 {{ formatSalesDisplay(product.sales) }}</span>
+        </div>
+      </div>
+    </div>
+  </el-card>
+</template>
+
 <script setup>
 import { Shop, Picture, Loading } from '@element-plus/icons-vue'
 
@@ -12,41 +66,26 @@ const props = defineProps({
 })
 
 const openProductLink = () => {
-  window.open(props.product.link, '_blank')
+  if (props.product.link && props.product.link !== '#') {
+    window.open(props.product.link, '_blank')
+  }
+}
+
+const openShopLink = (e) => {
+  e.preventDefault()
+  e.stopPropagation()
+  if (props.product.shopLink && props.product.shopLink !== '#') {
+    window.open(props.product.shopLink, '_blank')
+  }
+}
+
+const formatSalesDisplay = (sales) => {
+  if (sales >= 10000) {
+    return `${(sales / 10000).toFixed(1)}万+`
+  }
+  return sales
 }
 </script>
-
-<template>
-  <el-card class="product-card" :body-style="{ padding: '0px' }" shadow="hover" @click="openProductLink">
-    <div class="image-container">
-      <el-image :src="product.image" fit="cover" class="product-image" :alt="product.name">
-        <template #error>
-          <div class="image-error">
-            <el-icon><Picture /></el-icon>
-            <span>图片加载失败</span>
-          </div>
-        </template>
-        <template #placeholder>
-          <div class="image-loading">
-            <el-icon><Loading /></el-icon>
-          </div>
-        </template>
-      </el-image>
-    </div>
-    <div class="product-info">
-      <div class="product-name" :title="product.name">{{ product.name }}</div>
-      <div class="product-shop">
-        <el-icon><Shop /></el-icon>
-        <span>{{ product.shop }}</span>
-      </div>
-      <div class="product-price">
-        <span class="current-price">¥{{ product.price }}</span>
-        <span v-if="product.originalPrice" class="original-price">¥{{ product.originalPrice }}</span>
-        <span v-if="product.sales" class="sales">月销{{ product.sales }}笔</span>
-      </div>
-    </div>
-  </el-card>
-</template>
 
 <style scoped>
 .product-card {
@@ -55,38 +94,61 @@ const openProductLink = () => {
   transition: all 0.3s;
   border-radius: 8px;
   overflow: hidden;
+  border: 1px solid #ebeef5;
 }
 
 .product-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
 }
 
 .image-container {
   width: 100%;
-  height: 240px;
+  height: 0;
+  padding-bottom: 100%;
+  position: relative;
   overflow: hidden;
+  background: #f5f7fa;
 }
 
 .product-image {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   transition: transform 0.5s;
 }
 
 .product-card:hover .product-image {
-  transform: scale(1.05);
+  transform: scale(1.03);
 }
 
 .image-error,
 .image-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
   color: #999;
-  background-color: #f5f5f5;
+  background: #f5f5f5;
+}
+
+.product-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--el-color-success);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 1;
 }
 
 .product-info {
@@ -104,43 +166,65 @@ const openProductLink = () => {
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
+  margin-bottom: 8px;
+}
+
+.product-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .product-shop {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #999;
   display: flex;
   align-items: center;
+  font-size: 12px;
+  color: #666;
+  transition: color 0.2s;
 }
 
-.product-shop .el-icon {
-  margin-right: 4px;
+.product-shop:hover {
+  color: var(--el-color-primary);
+}
+
+.shop-name {
+  margin: 0 4px;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.location {
+  color: #999;
+  font-size: 11px;
 }
 
 .product-price {
-  margin-top: 8px;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
 }
 
 .current-price {
   color: #ff5000;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: bold;
-  margin-right: 8px;
-}
-
-.original-price {
-  color: #999;
-  font-size: 12px;
-  text-decoration: line-through;
-  margin-right: 8px;
 }
 
 .sales {
-  color: #999;
   font-size: 12px;
+  color: #999;
+}
+
+@media (max-width: 768px) {
+  .product-name {
+    font-size: 13px;
+    height: 36px;
+  }
+  
+  .current-price {
+    font-size: 15px;
+  }
 }
 </style>
