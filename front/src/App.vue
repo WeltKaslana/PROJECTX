@@ -63,6 +63,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   background-color: #f5f7fa;
+  overflow-y: auto;
 }
 
 .header {
@@ -87,14 +88,11 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   min-width: 0; /* 修复Flexbox溢出问题 */
-  height: calc(100vh - 60px);
-  overflow: hidden;
 }
 
 .router-content,
 .chat-content {
   flex: 1;
-  overflow-y: auto;
 }
 
 /* 响应式调整 */
