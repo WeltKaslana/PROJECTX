@@ -6,8 +6,8 @@ import logging
 
 from dao import userDAO
 from models import db
-from spider import result
-from ai import ai_get_history, ai_get_keywords, ai_delete_history
+from spider import crawler
+from ai import ai_get_history, ai_get_keywords, ai_delete_history, ai_recommend
 
 app = Flask(__name__)
 CORS(app)
@@ -85,11 +85,25 @@ def visitor():
 # 查询结果
 @app.route('/keywords/<string:session_id>/<string:question>', methods=['GET'], strict_slashes=False)
 def get__result(session_id, question):
-    keys, flag = ai_get_keywords(session_id, question) #调用AI获取关键词
-    # 根据关键词爬取网站，结果以json返回
-    res = result(keys, flag, session_id, question)
     print('-'*50)
     print(f'收到会话{session_id}的问题{question}')
+
+    keys, flag = ai_get_keywords(session_id, question) #调用AI获取关键词
+
+    if flag: #如果需要再次进行关键词搜索
+        crawler(keys,session_id) # 根据关键词爬取网站，并存入goods表
+        tip = "我认为你可能需要的商品是"
+        for i in keys:
+            tip += i + "、"
+        res = {
+            "tip": tip,
+            "result": ai_recommend(session_id, question),
+        }
+    else: #只需要对已得到的商品进行筛选推荐
+        res = {
+            "tip": None,
+            "result": ai_recommend(session_id, question),
+        }
     return json_response(message="得到结果", result=res)
 
 # 删除历史记录

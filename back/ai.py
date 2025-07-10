@@ -124,6 +124,9 @@ def ai_delete_history(session_id:str):
     history.clear()  # 清除聊天历史
 
 
+def ai_recommend(session_id:str, question:str):
+    pass
+
 #test函数
 # def test():
 #     ai_delete_history("user_1") # 清除历史记录
