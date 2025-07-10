@@ -11,6 +11,7 @@
     <MessageInput 
       :modelValue="message" 
       :chat-loading="chatLoading" 
+      :agent-error="agentError?.value || ''"
       @submit-message="handleSubmitMessage"
       @new-line="handleNewLine"
       :user="user"
@@ -20,22 +21,42 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuth } from '@/api/auth'
 import { useChat } from '@/api/chat'
+import { useAgent } from '@/api/agent'
 import MessageList from './MessageList.vue'
 import MessageInput from './MessageInput.vue'
 import Zhigou_Logo from '@/assets/logo.png'
 import { ElMessage } from 'element-plus'
 
 const { user, visitorLogin } = useAuth()
-const {
-  messages,
-  chatLoading,
-  fetchConversations
-} = useChat(user.value?.username)
+// const {
+//   messages,
+//   chatLoading,
+//   fetchConversations
+// } = useChat(user.value?.username)
+const chat = useChat(user.value?.username)
+const messages = chat.messages
+const chatLoading = chat.chatLoading
+const { fetchConversations } = chat
+
+
+// Agent模块 - 安全解构
+const agent = useAgent()
+const agentLoading = agent.loading
+const agentError = agent.error
+const { sendMessageToAgent } = agent
 
 const message = ref('')
+
+// 合并加载状态 - 安全访问
+const isLoading = computed(() => {
+  // 安全访问 ref 对象的 value 属性
+  const chatVal = chatLoading?.value ?? false
+  const agentVal = agentLoading?.value ?? false
+  return chatVal || agentVal
+})
 
 const handleSubmitMessage = async () => {
   if (!message.value.trim()) return
@@ -47,6 +68,24 @@ const handleSubmitMessage = async () => {
 
     chatLoading.value = true
     
+    // 添加用户消息到列表
+    const userMsg = {
+      role: 'user',
+      content: message.value,
+      timestamp: new Date().toISOString()
+    }
+    messages.value.push(userMsg)
+    
+    // 清空输入框
+    const userMessage = message.value
+    message.value = ''
+
+    // 调用agent接口
+    const agentResponse = await sendMessageToAgent({
+      message: userMessage,
+      conversationId: null // 实际使用中应传入当前对话ID
+    })
+
     // 调用后端API获取搜索结果
     const response = await fetch(
       `/keywords/${user.value.username}_${user.value.currentSession}/${encodeURIComponent(message.value)}`
@@ -80,6 +119,21 @@ const handleSubmitMessage = async () => {
     message.value = ''
   } catch (error) {
     ElMessage.error(`搜索失败: ${error.message}`)
+    let reason = error.reason || error.message || '未知错误'
+    
+    // 添加agent错误消息
+    messages.value.push({
+      role: 'assistant',
+      content: `处理您的请求时出错: ${reason}`,
+      timestamp: new Date().toISOString()
+    })
+    
+    // 更新错误状态
+    if (agentError) {
+      agentError.value = reason
+    }
+    
+    ElMessage.error(`发送消息失败: ${reason}`)
   } finally {
     chatLoading.value = false
   }
