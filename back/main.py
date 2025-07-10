@@ -6,7 +6,7 @@ import logging
 
 from dao import userDAO
 from models import db
-from spider import crawler
+from spider import crawler,test
 from ai import ai_get_history, ai_get_keywords, ai_delete_history, ai_recommend
 
 app = Flask(__name__)
@@ -153,6 +153,11 @@ def new(username):
         return json_response(message="创建成功", result=nc)
     else:
         return json_response(code=500, message="新对话创建失败", reason="用户不存在")
+
+@app.route('/test', methods=['GET'], strict_slashes=False)
+def main_test():
+    print('test')
+    test()
 
 if __name__ == '__main__':
     # app.run(debug=True)
