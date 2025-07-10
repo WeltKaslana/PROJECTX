@@ -42,14 +42,20 @@ const routes = [
         component: LoginView,
     },
     {
-        path:'/register',
-        name:'register',
+        path: '/register',
+        name: 'register',
         component: RegisterView
     },
     {
         path: '/test',
         name: 'test',
-        component: Testview, 
+        component: Testview,
+    },
+    {
+        path: '/chat',
+        name: 'chat',
+        component: () => import('@/views/ChatView.vue'),
+        meta: { showChat: true }
     },
 
 ]
