@@ -1,4 +1,4 @@
-from models import db, User, History
+from models import db, User, History, Goods
 import random
 
 def check_re(username: str):
@@ -68,3 +68,21 @@ class userDAO():
     
     def delete_history(session_id: str):
         History.query.filter_by(session_id=session_id).delete()
+
+    def add_goods(session_id: str, name: str, price: float, img_url: str, shop_url: str, goods_url: str, deals: int):
+        db.session.add(Goods(session_id=session_id, name=name, price=price, img_url=img_url, shop_url=shop_url, goods_url=goods_url, deals=deals))
+    
+    def find_goods(session_id: str):
+        query_res = Goods.query.filter_by(session_id=session_id).all()
+        goods = []
+        for good in query_res:
+            good_data = {
+                'name': good.name,
+                'price': good.price,
+                'deals': good.deals,
+                'img_url': good.img_url,
+                'goods_url': good.goods_url,
+                'shop_url': good.shop_url,
+            }
+            goods.append(good_data)
+        return goods
