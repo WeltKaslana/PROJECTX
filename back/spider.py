@@ -421,7 +421,7 @@ def crawler(keys,session_id):
     save_json_result(result_data, session_id)
     
     # 返回JSON字符串
-    return json.dumps(result_data, ensure_ascii=False, indent=2)
+    # return json.dumps(result_data, ensure_ascii=False, indent=2)
 
 
 
