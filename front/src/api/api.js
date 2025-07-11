@@ -31,34 +31,46 @@ export default {
   visitorLogin() {
     return api.get('/visitor');
   },
-  
+
   // 用户注册
   register(username, password) {
     return api.get(`/register/${username}/${password}`);
   },
-  
+
   // 用户登录
   login(username, password) {
     return api.get(`/login/${username}/${password}`);
   },
-  
+
   // 创建新对话
   newConversation(username) {
     return api.get(`/new/${username}`);
   },
-  
+
   // 获取历史记录数
   getHistoryCount(username) {
     return api.get(`/historycount/${username}`);
   },
-  
+
   // 获取历史记录
   getHistory(sessionId) {
     return api.get(`/history/${sessionId}`);
   },
-  
+
   // 关键词查询
   searchKeywords(sessionId, question) {
-    return api.get(`/keywords/${sessionId}/${encodeURIComponent(question)}`);
+    // 确保参数有效
+    if (!sessionId || typeof question === 'undefined') {
+      return Promise.reject(new Error('缺少必要参数'));
+    }
+
+    // 仅对question进行编码
+    const encodedQuestion = encodeURIComponent(question);
+    return api.get(`/keywords/${sessionId}/${encodedQuestion}`);
+
+  },
+    // 新增方法：获取商品卡片数据
+  fetchProductCards(sessionId) {
+    return api.get(`/products/${sessionId}`);
   }
 }

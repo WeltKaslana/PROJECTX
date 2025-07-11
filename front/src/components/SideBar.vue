@@ -1,62 +1,47 @@
 <template>
   <el-aside :width="sidebarWidth" class="sidebar">
-    <el-menu default-active="2" class="vertical-menu" :router="true" mode="vertical">
-      <!-- 创建新聊天 -->
-      <el-menu-item index="/chat" @click="handleCreateNewChat" :disabled="chatLoading">
-        <el-icon><icon-menu /></el-icon>
-        <span>创建新聊天</span>
-      </el-menu-item>
-
-      <!-- 历史对话下拉菜单 -->
-      <el-submenu index="history" v-if="conversations.length > 0">
-        <template #title>
-          <el-icon>
-            <document />
-          </el-icon>
-          <span>历史对话</span>
-        </template>
-        <el-menu-item v-for="conv in conversations" :key="conv.id" @click="loadHistory(conv.id)">
-          {{ conv.title }}
-        </el-menu-item>
-      </el-submenu>
-      <el-menu-item v-else index="no-history" disabled>
-        <el-icon>
-          <document />
-        </el-icon>
-        <span>暂无历史对话</span>
-      </el-menu-item>
-
-      <!-- 历史聊天 -->
-      <el-menu-item index="3" @click="loadHistory(currentConversation)"
-        :disabled="!currentConversation || chatLoading">
-        <el-icon><icon-menu /></el-icon>
-        <span>历史聊天</span>
-      </el-menu-item>
-
-      <!-- 底部固定菜单 -->
-      <div class="menu-footer">
-        <el-menu-item index="/settings">
-          <el-icon>
-            <Setting />
-          </el-icon>
-          <span>用户设置</span>
-        </el-menu-item>
-        <el-menu-item index="/help">
-          <el-icon>
-            <Location />
-          </el-icon>
-          <span>帮助页面</span>
-        </el-menu-item>
+    <div class="sidebar-content">
+      <!-- 创建新聊天按钮 -->
+      <div class="new-chat-btn" @click="handleCreateNewChat">
+        <el-icon><Plus /></el-icon>
+        <span>新建聊天</span>
       </div>
-    </el-menu>
+
+      <!-- 历史对话列表 -->
+      <div class="history-section">
+        <div class="section-header">
+          <el-icon><Clock /></el-icon>
+          <span>历史对话</span>
+        </div>
+        
+        <div class="conversation-list" :class="{ 'has-scroll': conversations.length > 10 }">
+          <div 
+            v-for="conv in conversations" 
+            :key="conv.id" 
+            class="conversation-item"
+            :class="{ 'active': conv.id === currentConversation }"
+            @click="loadHistory(conv.id)"
+          >
+            <el-icon><ChatDotRound /></el-icon>
+            <span class="conversation-title">{{ formatConversationTitle(conv.title) }}</span>
+            <span class="conversation-time">{{ formatTime(conv.createdAt) }}</span>
+          </div>
+          
+          <div v-if="conversations.length === 0" class="empty-tip">
+            <el-icon><FolderOpened /></el-icon>
+            <span>暂无历史对话</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </el-aside>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useAuth } from '@/api/auth'
 import { useChat } from '@/api/chat'
-import { Document, Menu as IconMenu, Setting, Location } from '@element-plus/icons-vue'
+import { Plus, Clock, ChatDotRound, FolderOpened } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 // 响应式计算侧边栏宽度
@@ -77,10 +62,6 @@ onMounted(() => {
   })
 })
 
-watch(() => window.innerWidth, () => {
-  sidebarWidth.value = calculateWidth()
-})
-
 // 认证模块
 const { user, visitorLogin } = useAuth()
 
@@ -92,6 +73,17 @@ const {
   createNewChat,
   loadHistory
 } = useChat(user.value?.username)
+
+// 格式化对话标题
+const formatConversationTitle = (title) => {
+  return title.length > 15 ? title.substring(0, 15) + '...' : title
+}
+
+// 格式化时间
+const formatTime = (timestamp) => {
+  const date = new Date(timestamp)
+  return `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`
+}
 
 // 创建新聊天
 const handleCreateNewChat = async () => {
@@ -117,16 +109,132 @@ const handleCreateNewChat = async () => {
   overflow: hidden;
 }
 
-.vertical-menu {
+.sidebar-content {
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-right: none;
+  padding: 10px;
 }
 
-.menu-footer {
-  margin-top: auto;
-  padding-bottom: 20px;
+.new-chat-btn {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  background-color: var(--el-color-primary);
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.new-chat-btn:hover {
+  background-color: var(--el-color-primary-light-3);
+}
+
+.new-chat-btn .el-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.history-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  padding: 5px 10px;
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+}
+
+.section-header .el-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.conversation-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.conversation-list.has-scroll {
+  max-height: calc(100vh - 180px);
+}
+
+.conversation-item {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  margin-bottom: 5px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.conversation-item:hover {
+  background-color: var(--el-color-primary-light-9);
+}
+
+.conversation-item.active {
+  background-color: var(--el-color-primary-light-8);
+}
+
+.conversation-item .el-icon {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  font-size: 16px;
+  color: var(--el-text-color-secondary);
+}
+
+.conversation-title {
+  padding-left: 25px;
+  margin-bottom: 3px;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversation-time {
+  padding-left: 25px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.empty-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
+  color: var(--el-text-color-secondary);
+}
+
+.empty-tip .el-icon {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+/* 滚动条样式 */
+.conversation-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.conversation-list::-webkit-scrollbar-thumb {
+  background-color: var(--el-color-primary-light-5);
+  border-radius: 3px;
+}
+
+.conversation-list::-webkit-scrollbar-track {
+  background-color: var(--el-color-primary-light-9);
 }
 
 /* 移动端隐藏时的动画 */

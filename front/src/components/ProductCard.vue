@@ -12,6 +12,8 @@
         class="product-image" 
         :alt="product.name"
         lazy
+        :preview-src-list="[product.image]"
+        hide-on-click-modal
       >
         <template #error>
           <div class="image-error">
@@ -67,15 +69,18 @@ const props = defineProps({
 
 const openProductLink = () => {
   if (props.product.link && props.product.link !== '#') {
-    window.open(props.product.link, '_blank')
+    window.open(props.product.link.startsWith('http') ? 
+      props.product.link : 
+      `https://${props.product.link}`, '_blank')
   }
 }
 
 const openShopLink = (e) => {
-  e.preventDefault()
   e.stopPropagation()
   if (props.product.shopLink && props.product.shopLink !== '#') {
-    window.open(props.product.shopLink, '_blank')
+    window.open(props.product.shopLink.startsWith('http') ? 
+      props.product.shopLink : 
+      `https://${props.product.shopLink}`, '_blank')
   }
 }
 
@@ -83,11 +88,12 @@ const formatSalesDisplay = (sales) => {
   if (sales >= 10000) {
     return `${(sales / 10000).toFixed(1)}万+`
   }
-  return sales
+  return sales || 0
 }
 </script>
 
 <style scoped>
+/* 原有样式保持不变 */
 .product-card {
   width: 100%;
   cursor: pointer;
