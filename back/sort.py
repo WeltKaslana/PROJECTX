@@ -7,6 +7,7 @@ from langchain_deepseek import ChatDeepSeek
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_redis import RedisChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory 
+from langchain_core.output_parsers import StrOutputParser # 导⼊字符串输出解析器
 import os
 from dotenv import load_dotenv
 
@@ -24,6 +25,13 @@ llm = ChatDeepSeek(
     timeout=180,
 )
 
+# llm = ChatDeepSeek(
+#     model='deepseek-ai/DeepSeek-R1',
+#     temperature=0,
+#     api_key=key,
+#     api_base=base,
+#     timeout=180,#增加请求超时限制
+# )
 
 # 数据模型定义
 class Product(BaseModel):
@@ -39,6 +47,10 @@ class SortedProducts(BaseModel):
     sorting_rules: str = Field(..., description="排序规则说明，需明确说明排序依据")
     output_count: int = Field(..., description="实际输出的商品数量，需与用户指定或默认值一致")
 
+class Project(BaseModel):
+    name: str = Field(..., description="可能想要买的商品的名称，只用一个词描述想要的商品,可以带修饰词描述，如果商品有多个，请列出商品名并用|分隔")
+    # description: str = Field(..., description="对于每个想要买的商品的描述，用|分隔")
+    
 class metamessage:
     def __init__(self, mestype:type, contents):
         self.type = mestype
@@ -75,6 +87,72 @@ class InMemoryHistory(BaseChatMessageHistory, BaseModel):
     def clear(self) -> None:
         self.messages = []
 
+def ai_get_keywords(session_id:str, question: str):
+    router_chain = (
+        PromptTemplate.from_template("""
+            你和另一人一同完成商品推荐的工作，
+            请根据下面用户的问题，将用户的问题分类为'1'或'0'。
+            若用户的问题涉及需要推荐商品或者继续细化之前提到的商品的特征，则分类为'1'。
+            若用户的问题设计到讨论商品在价格、销量等方面的表现，则分类为'0'。
+            只需要回复'0'或者'1'。
+            <question>
+            {question}
+            </question>
+            分类结果：""") | llm | StrOutputParser()
+    )
+    result = router_chain.invoke({"question": question}) # 调用路由链，获取问题类型
+    
+    print("问题类型：", result) # 打印问题类型
+    if int(result) == 0: # 如果问题类型不是关于商品推荐
+        return([], False) # 返回空列表和False
+    
+    # 实例化解析器、提示词模板
+    parser = PydanticOutputParser(pydantic_object=Project)
+    # 注意，提示词模板中需要部分格式化解析器的格式要求format_instructions 
+    prompt = PromptTemplate(
+        template="{history}\n回答⽤户的查询，查询出的商品名是关于日常商品的，如果结果有多个请用|分隔,商品描述如果有多个也请用|分隔.\n{format_instructions}\n{question}",
+        input_variables=["history","question"],
+        partial_variables={"format_instructions": parser.get_format_instructions()}
+    )
+     # 将提示模板与模型组合成⼀个处理链
+    chain = prompt | llm | parser
+    redis_history = RedisChatMessageHistory(
+        redis_url = "redis://47.98.143.59:6379",# Redis 连接URL
+        session_id = session_id, # 会话ID
+    )
+    # 转换函数
+    def get_by_session_id(session_id:str) -> BaseChatMessageHistory:
+        temp = InMemoryHistory()
+        temp.add_messages(redis_history.messages)  # 将Redis消息添加到临时内存历史中
+        return temp
+    # 创建⼀个带有消息历史的可运⾏对象
+    chain_with_history  = RunnableWithMessageHistory(
+        chain,# 基础链
+        get_by_session_id,
+        input_messages_key="question",  # 指定输⼊消息的键为"question"
+        history_messages_key="history", # 指定历史消息的键为"history"
+    )
+    res = chain_with_history.invoke(
+        {"question": question},
+        config={"configurable": {"session_id": session_id}}  # 配置会话ID为"foo"
+    )
+    # # 向历史记录中添加消息
+    redis_history.add_user_message(question)
+    pro = res.name.split("|")
+    ai_message = "我认为你可能需要的商品是"
+    for i in pro:
+        ai_message += i + "、"
+    redis_history.add_ai_message(ai_message)
+    # print("商品名称：",res.name.split("|"))
+    # print("商品描述：",res.description.split("|"))
+    return (pro, True)
+
+def ai_delete_history(session_id:str):
+    history = RedisChatMessageHistory(
+        redis_url = "redis://47.98.143.59:6379",# Redis 连接URL
+        session_id = session_id, # 会话ID
+    )
+    history.clear()  # 清除聊天历史
 
 def ai_sort_products(
     session_id: str,
@@ -197,19 +275,20 @@ def ai_sort_products(
     return result.sorted_products
 
 
+
 # ------------------------------
 # 测试用例（覆盖所有新功能）
 # ------------------------------
-if __name__ == "__main__":
-    # 测试数据：更多商品（超过5个，测试top_n功能）
-    test_products = [
-        {"name": "无线耳机", "price": 299, "rating": 4.5, "sales": 1200},
-        {"name": "蓝牙音箱", "price": 199, "rating": 4.2, "sales": 800},
-        {"name": "智能手表", "price": 599, "rating": 4.7, "sales": 1500},
-        {"name": "手机支架", "price": 39, "rating": 4.0, "sales": 3000},
-        {"name": "充电宝", "price": 89, "rating": 4.3, "sales": 2500},
-        {"name": "蓝牙耳机", "price": 159, "rating": 4.4, "sales": 1800}  # 第6个商品
-    ]
+# if __name__ == "__main__":
+    # # 测试数据：更多商品（超过5个，测试top_n功能）
+    # test_products = [
+    #     {"name": "无线耳机", "price": 299, "rating": 4.5, "sales": 1200},
+    #     {"name": "蓝牙音箱", "price": 199, "rating": 4.2, "sales": 800},
+    #     {"name": "智能手表", "price": 599, "rating": 4.7, "sales": 1500},
+    #     {"name": "手机支架", "price": 39, "rating": 4.0, "sales": 3000},
+    #     {"name": "充电宝", "price": 89, "rating": 4.3, "sales": 2500},
+    #     {"name": "蓝牙耳机", "price": 159, "rating": 4.4, "sales": 1800}  # 第6个商品
+    # ]
 
     # # 测试1：默认排序（前5名，无偏好）
     # print("=== 测试1：默认排序（前5名，无偏好） ===")
@@ -224,7 +303,22 @@ if __name__ == "__main__":
     #     print(f"{i}. {p.name} - 销量：{p.sales}")
 
     # 测试3：追加偏好调整（基于上一轮历史，新增「价格低于200」）
-    print("\n=== 测试3：追加偏好（销量高且价格低于200） ===")
-    sorted3 = ai_sort_products("test_user", test_products, user_preferences="销量高且价格低于200", top_n=3)
-    for i, p in enumerate(sorted3, 1):
-        print(f"{i}. {p.name} - 价格：{p.price}，销量：{p.sales}")
+    # print("\n=== 测试3：追加偏好（销量高且价格低于200） ===")
+    # sorted3 = ai_sort_products("test_user", test_products, user_preferences="销量高且价格低于200", top_n=3)
+    # for i, p in enumerate(sorted3, 1):
+    #     print(f"{i}. {p.name} - 价格：{p.price}，销量：{p.sales}")
+    
+    # # 测试4：多轮调整（基于历史偏好）
+    # ai_delete_history("user_1") # 清除历史记录
+    # print("处理请求中。。。")
+    # print(ai_get_keywords("user_1", "我想买个戴在手上的")) # 测试函数
+    # # print("按1继续")
+    # # if input() == "1":
+    # print("处理请求中。。。")
+    # print(ai_get_keywords("user_1", "最好是金色的"))
+    # # print("按2继续")
+    # # if input() == "2":
+    # print("处理请求中。。。")
+    # print("历史消息：") # 显示当前历史消息
+    # for i in ai_get_history("user_1"):
+    #     print("说话对象：", i.type,"交流内容：" , i.content) # 打印每条消息的类型和内容
