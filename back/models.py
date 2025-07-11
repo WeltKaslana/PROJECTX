@@ -23,6 +23,10 @@ class Goods(db.Model):
 
     item_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     session_id = db.Column(db.String(25), db.ForeignKey('History.session_id'), nullable=False)
+    
+    talk_id = db.Column(db.Integer, nullable=False)
+    keyword = db.Column(db.String(40), nullable=False)
+
     name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Float, nullable=False)
     deals = db.Column(db.Integer, nullable=False)

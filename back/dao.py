@@ -1,5 +1,6 @@
 from models import db, User, History, Goods
 import random
+from sqlalchemy import func
 
 def check_re(username: str):
     import re
@@ -69,21 +70,90 @@ class userDAO():
     def delete_history(session_id: str):
         History.query.filter_by(session_id=session_id).delete()
 
-    def add_goods(session_id: str, name: str, price: float, img_url: str, shop_url: str, goods_url: str, deals: int):
-        db.session.add(Goods(session_id=session_id, name=name, price=price, img_url=img_url, shop_url=shop_url, goods_url=goods_url, deals=deals))
+    # def add_goods(session_id: str, name: str, price: float, img_url: str, shop_url: str, goods_url: str, deals: int):
+    #     db.session.add(Goods(
+    #         session_id=session_id, 
+    #         name=name, price=price, 
+    #         img_url=img_url, 
+    #         shop_url=shop_url, 
+    #         goods_url=goods_url, 
+    #         deals=deals))
+    #     db.session.commit()
+
+    def add_goods(session_id: str, 
+                  talk_id: int, 
+                  keyword: str, 
+                  name: str, 
+                  price: float, 
+                  deals: int,
+                  goods_url: str,
+                  shop_url: str, 
+                  img_url: str, 
+                  ):
+        db.session.add(Goods(
+            session_id,
+            talk_id,
+            keyword,
+            name,
+            price,
+            deals,
+            goods_url,
+            shop_url,
+            img_url,
+        ))
         db.session.commit()
 
-    def find_goods(session_id: str):
-        query_res = Goods.query.filter_by(session_id=session_id).all()
+    def new_talk_id(session_id: str):
+        last_id = Goods.query.filter_by(session_id=session_id).order_by(Goods.talk_id.desc()).first()
+        if last_id:
+            last_cid = int(last_id.conversation_id)
+            new_cid = last_cid + 1
+        else:
+            new_cid = 1
+        return new_cid
+
+
+    # def find_goods(session_id: str):
+    #     query_res = Goods.query.filter_by(session_id=session_id).all()
+    #     goods = []
+    #     for good in query_res:
+    #         good_data = {
+    #             'name': good.name,
+    #             'price': good.price,
+    #             'deals': good.deals,
+    #             'img_url': good.img_url,
+    #             'goods_url': good.goods_url,
+    #             'shop_url': good.shop_url,
+    #         }
+    #         goods.append(good_data)
+    #     return goods
+
+    def find_goods(session_id: str, keyword: str):
+        subquery = db.session.query(
+            func.max(Goods.talk_id)
+        ).filter_by(session_id=session_id, keyword=keyword).scalar_subquery()
+        goods_list = Goods.query.filter(
+            Goods.session_id == session_id,
+            Goods.keyword == keyword,
+            Goods.talk_id == subquery
+        ).all()
         goods = []
-        for good in query_res:
-            good_data = {
+        for good in goods_list:
+            goods.append({
                 'name': good.name,
                 'price': good.price,
                 'deals': good.deals,
-                'img_url': good.img_url,
                 'goods_url': good.goods_url,
                 'shop_url': good.shop_url,
-            }
-            goods.append(good_data)
+                'img_url': good.img_url,
+            })
         return goods
+    
+    def find_keys(session_id: str):
+        subquery = db.session.query(
+            func.max(Goods.talk_id)
+        ).filter_by(session_id=session_id).scalar_subquery()
+        res = db.session.query(Goods.keyword).filter_by(
+            session_id=session_id,
+            talk_id = subquery).distinct().all()
+        return [key[0] for key in res]

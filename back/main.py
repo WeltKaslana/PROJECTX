@@ -3,6 +3,8 @@ from flask_cors import CORS
 from waitress import serve
 import json
 import logging
+from datetime import datetime
+import pytz, threading
 
 from dao import userDAO
 from models import db
@@ -58,7 +60,7 @@ def get_history_count(username):
     if not userDAO.check_username(username):
         res = userDAO.get_history_count(username)
         print('-'*50)
-        print(f'查询到{username}的历史会话：{res}')
+        print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    查询到{username}的历史会话：\n{res}')
         return json_response(message="查询成功",result=res)
     else:
         return json_response(code=404, message="查询失败",reason="用户不存在")
@@ -69,6 +71,8 @@ def get__history(session_id):
     username, cid = session_id.split("_")
     if userDAO.check(username, cid):
         res = ai_get_history(session_id)
+        print('-'*50)
+        print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    查询到{session_id}的历史记录：\n{res}')
         return json_response(message="查询成功", result=res)
     else:
         return json_response(code=404, message="查询失败", reason="无此用户或无此会话")
@@ -79,32 +83,66 @@ def visitor():
     nn = userDAO.visitoradd()
     nc = userDAO.newc(nn)
     print('-'*50)
-    print(f'游客{nn}登录成功，会话ID为：{nc}')
+    print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    游客{nn}登录成功，会话ID为：{nc}')
     return json_response(message="游客登录成功", result=[nn, nc])
+
+
+# 线程安全的爬虫任务
+def threaded_crawler(key, session_id, nt):
+    try:
+        # 为每个线程创建应用上下文
+        with app.app_context():
+            
+            # 执行爬取任务
+            crawler(key, session_id, nt)
+            
+    except Exception as e:
+        # 捕获异常并记录
+        print(f"Thread error for key '{key}': {str(e)}")
 
 # 查询结果
 @app.route('/keywords/<string:session_id>/<string:question>', methods=['GET'], strict_slashes=False)
 def get__result(session_id, question):
     print('-'*50)
-    print(f'收到会话{session_id}的问题{question}')
+    print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    收到会话{session_id}的问题{question}')
+    
+    # keys, flag = ai_get_keywords(session_id, question) #调用AI获取关键词
+    keys = ['手机','手表']
+    flag = 1
 
-    keys, flag = ai_get_keywords(session_id, question) #调用AI获取关键词
+    if flag:
+        nt = userDAO.new_talk_id(session_id)
 
-    if flag: #如果需要再次进行关键词搜索
-        crawler(keys,session_id) # 根据关键词爬取网站，并存入goods表
-        tip = "我认为你可能需要的商品是"
-        for i in keys:
-            tip += i + "、"
-        res = {
-            "tip": tip,
-            "result": ai_recommend(session_id, question),
-        }
-    else: #只需要对已得到的商品进行筛选推荐
-        res = {
-            "tip": None,
-            "result": ai_recommend(session_id, question),
-        }
-    return json_response(message="得到结果", result=res)
+        threads =[]
+
+        for key in keys: #根据关键词爬取网站，结果以json返回
+            thread = threading.Thread(
+                target=threaded_crawler, 
+                args=(key, session_id, nt)
+            )
+            threads.append(thread)
+            thread.start()
+        
+        for thread in threads:
+            thread.join()
+
+        tip = "我认为你可能需要的商品是 "
+        res = '_'.join(keys)
+        return json_response(message=tip+','.join(keys), result=res)
+    else:
+        keys = userDAO.find_keys(session_id)
+        res = '_'.join(keys)
+        return json_response(message=None, result=res)
+    
+@app.route('/result/<string:session_id>/<string:question>/<string:keys>', methods=['GET'], strict_slashes=False)
+def get_result(session_id, question, keys):
+    key_list = keys.split("_")
+    
+    print('-'*50)
+    print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    正在对会话{session_id}的问题‘{question}’进行推荐')
+    
+    res = ai_recommend(session_id=session_id, question=question, keys=key_list)
+    return json_response(message="得到推荐结果", result=res)
 
 # 删除历史记录
 @app.route('/delete/<string:session_id>', methods=['GET'], strict_slashes=False)
@@ -114,7 +152,7 @@ def delete(session_id):
         ai_delete_history(session_id)
         userDAO.delete_history(session_id)
         print('-'*50)
-        print(f'删除了会话{session_id}')
+        print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    删除了会话{session_id}')
         return json_response(message="删除成功")
     else:
         return json_response(code=500, message="删除失败", reason="无此会话")
@@ -123,7 +161,7 @@ def delete(session_id):
 @app.route('/register/<string:username>/<string:password>', methods=['GET'], strict_slashes=False)
 def register(username, password):
     print('-'*50)
-    print(f'注册用户{username}, 密码{password}')
+    print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    注册用户{username}, 密码{password}')
     if userDAO.check_username(username):
         userDAO.add_user(username, password)
         return json_response(message="注册成功")
@@ -135,7 +173,7 @@ def register(username, password):
 @app.route('/login/<string:username>/<string:password>', methods=['GET'], strict_slashes=False)
 def login(username, password):
     print('-'*50)
-    print(f'用户{username}登录, 密码{password}')
+    print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    用户{username}登录, 密码{password}')
     if userDAO.checklog(username, password):
         return json_response(message="登录成功")
     else:
@@ -149,14 +187,14 @@ def new(username):
     if not userDAO.check_username(username):
         nc = userDAO.newc(username)
         print('-'*50)
-        print(f'用户{username}创建了新会话{nc}')
+        print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    用户{username}创建了新会话{nc}')
         return json_response(message="创建成功", result=nc)
     else:
         return json_response(code=500, message="新对话创建失败", reason="用户不存在")
 
 @app.route('/test', methods=['GET'], strict_slashes=False)
 def main_test():
-    print('test')
+    print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    testing...')
     test()
     return json_response(message="test")
 
