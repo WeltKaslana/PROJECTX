@@ -91,22 +91,22 @@ class userDAO():
                   img_url: str, 
                   ):
         db.session.add(Goods(
-            session_id,
-            talk_id,
-            keyword,
-            name,
-            price,
-            deals,
-            goods_url,
-            shop_url,
-            img_url,
+            session_id=session_id,
+            talk_id = talk_id,
+            keyword = keyword,
+            name = name,
+            price = price,
+            deals = deals,
+            goods_url = goods_url,
+            shop_url=shop_url,
+            img_url=img_url,
         ))
         db.session.commit()
 
     def new_talk_id(session_id: str):
         last_id = Goods.query.filter_by(session_id=session_id).order_by(Goods.talk_id.desc()).first()
         if last_id:
-            last_cid = int(last_id.conversation_id)
+            last_cid = int(last_id.talk_id)
             new_cid = last_cid + 1
         else:
             new_cid = 1

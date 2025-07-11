@@ -14,7 +14,6 @@ from urllib.parse import quote
 from datetime import datetime
 from dao import userDAO
 import threading
-from main import app
 
 # 全局变量
 count = 1  # Excel写入计数
@@ -239,7 +238,7 @@ def load_jd_valid_cookies():
         return get_jd_login_cookies()
 
 # -------------------------- 淘宝爬取逻辑 --------------------------
-def taobao_Crawler_main(driver, KEYWORD, pageStart, pageEnd, session_id):
+def taobao_Crawler_main(driver, KEYWORD, pageStart, pageEnd, session_id, nt):
     """淘宝主爬取函数"""
     global wait
     wait = WebDriverWait(driver, 20)
@@ -251,11 +250,11 @@ def taobao_Crawler_main(driver, KEYWORD, pageStart, pageEnd, session_id):
         # 处理起始页
         if pageStart != 1:
             taobao_turn_pageStart(driver, pageStart)
-        taobao_goods_list.extend(taobao_get_goods(driver, pageStart, session_id))
+        taobao_goods_list.extend(taobao_get_goods(driver, pageStart, session_id, KEYWORD, nt))
         # 爬取后续页面
         for i in range(pageStart + 1, pageEnd + 1):
             taobao_page_turning(driver, i)
-            taobao_goods_list.extend(taobao_get_goods(driver, i, session_id))
+            taobao_goods_list.extend(taobao_get_goods(driver, i, session_id, KEYWORD, nt))
     except Exception as exc:
         print(f"淘宝Crawler_main函数错误！Error：{exc}")
     return taobao_goods_list
@@ -364,7 +363,7 @@ def taobao_scroll_step_by_step(driver, scroll_distance=500, pause_time=1):
     time.sleep(pause_time)
     print("淘宝分步滚动完成，所有懒加载内容已加载")
 
-def taobao_get_goods(driver, page, session_id):
+def taobao_get_goods(driver, page, session_id, KEYWORD, nt):
     """淘宝获取商品数据"""
     tb_goods_list = []
     try:
@@ -437,13 +436,14 @@ def taobao_get_goods(driver, page, session_id):
                 # 保存商品到数据库
                 userDAO.add_goods(
                     session_id=session_id,
+                    talk_id = nt,
+                    keyword=KEYWORD,
                     name=name,
                     price=price,
-                    img_url=img_url,
-                    shop_url=shop_url,
-                    goods_url=goods_url,
                     deals=deals,
-                    
+                    goods_url=goods_url,
+                    shop_url=shop_url,
+                    img_url=img_url,
                 )
                 success_count += 1
             except Exception as e:
@@ -458,7 +458,7 @@ def taobao_get_goods(driver, page, session_id):
     return tb_goods_list
 
 # -------------------------- 京东爬取逻辑 --------------------------
-def jd_Crawler_main(driver, KEYWORD, pageStart, pageEnd, session_id):
+def jd_Crawler_main(driver, KEYWORD, pageStart, pageEnd, session_id, nt):
     """京东主爬取函数"""
     global wait
     wait = WebDriverWait(driver, 20)
@@ -469,11 +469,11 @@ def jd_Crawler_main(driver, KEYWORD, pageStart, pageEnd, session_id):
         # 处理起始页
         if pageStart != 1:
             jd_turn_pageStart(driver, pageStart)
-        jingdong_goods_list.extend(jd_get_goods(driver, pageStart, session_id))
+        jingdong_goods_list.extend(jd_get_goods(driver, pageStart, session_id, KEYWORD, nt))
         # 爬取后续页面
         for i in range(pageStart + 1, pageEnd + 1):
             jd_page_turning(driver, i)
-            jingdong_goods_list.extend(jd_get_goods(driver, i, session_id))     
+            jingdong_goods_list.extend(jd_get_goods(driver, i, session_id, KEYWORD, nt))     
     except Exception as exc:
         print(f"京东Crawler_main函数错误！Error：{exc}")
     return jingdong_goods_list
@@ -571,7 +571,7 @@ def jd_scroll_step_by_step(driver, scroll_distance=600, pause_time=1):
     time.sleep(pause_time)
     print("京东商品懒加载内容已加载")
 
-def jd_get_goods(driver, page, session_id):
+def jd_get_goods(driver, page, session_id, KEYWORD, nt):
     """获取京东商品数据（核心：京东商品元素选择器）"""
     jd_goods_list = []
     try:
@@ -656,13 +656,14 @@ def jd_get_goods(driver, page, session_id):
                 # 保存商品到数据库
                 userDAO.add_goods(
                     session_id=session_id,
+                    talk_id = nt,
+                    keyword=KEYWORD,
                     name=title,
                     price=price,
-                    img_url=img_url,
-                    shop_url=shop_url,
-                    goods_url=goods_url,
                     deals=deals,
-                    
+                    goods_url=goods_url,
+                    shop_url=shop_url,
+                    img_url=img_url,
                 )
 
                 success_count += 1
@@ -700,51 +701,55 @@ def save_json_result(data, session_id):
         print(f"保存JSON文件失败: {e}")
         return None
 
-def crawler(keys, session_id):
+def crawler(app, keys, session_id, nt):
     goods_list = []
     lock = threading.Lock()
     if keys:  # 当flag为True且keys列表不为空时执行爬取
         pageStart = 1
         pageEnd = 1
         # 将关键词列表转换为字符串（用空格连接）
-        combined_keyword = ' '.join(keys)
-        print(f"开始爬取组合关键词: {combined_keyword}")
+        print(f"开始爬取组合关键词: {keys}")
 
         # 获取淘宝登录后的浏览器实例
         taobao_driver = load_taobao_valid_cookies()
         # 获取京东登录后的浏览器实例
-        jd_driver = load_jd_valid_cookies()
+        # jd_driver = load_jd_valid_cookies()
 
         # 定义线程函数
         def taobao_crawl():
             nonlocal goods_list
             with app.app_context(): 
-                taobao_goods = taobao_Crawler_main(taobao_driver, combined_keyword, pageStart, pageEnd, session_id)
+                taobao_goods = taobao_Crawler_main(taobao_driver, keys, pageStart, pageEnd, session_id, nt)
             with lock:
                 goods_list.extend(taobao_goods)
 
         def jingdong_crawl():
             nonlocal goods_list
             with app.app_context():
-                jingdong_goods = jd_Crawler_main(jd_driver, combined_keyword, pageStart, pageEnd, session_id)       
+                jingdong_goods = jd_Crawler_main(jd_driver, keys, pageStart, pageEnd, session_id, nt)       
             with lock:
                 goods_list.extend(jingdong_goods)
 
+        threads = []
+
         # 创建线程
         taobao_thread = threading.Thread(target=taobao_crawl)
-        jd_thread = threading.Thread(target=jingdong_crawl)
+        # jd_thread = threading.Thread(target=jingdong_crawl)
+
+        threads.append(taobao_thread)
+        # threads.append(jd_thread)
 
         # 启动线程
         taobao_thread.start()
-        jd_thread.start()
+        # jd_thread.start()
 
         # 等待线程完成
-        taobao_thread.join()
-        jd_thread.join()
+        for thread in threads:
+            thread.join()
 
         # 关闭浏览器
         taobao_driver.quit()
-        jd_driver.quit()
+        # jd_driver.quit()
 
     # 构建返回结果
     result_data = {

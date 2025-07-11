@@ -5,6 +5,7 @@ import json
 import logging
 from datetime import datetime
 import pytz, threading
+import urllib3
 
 from dao import userDAO
 from models import db
@@ -18,6 +19,11 @@ CORS(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:abc123456@47.98.143.59/user_db?charset=utf8mb4'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JSON_AS_ASCII'] = False
+
+http = urllib3.PoolManager(
+    maxsize=30,  # 调整为足够处理并发请求的大小
+    block=True   # 连接池满时是否阻塞等待
+)
 
 db.init_app(app)
 
@@ -88,13 +94,13 @@ def visitor():
 
 
 # 线程安全的爬虫任务
-def threaded_crawler(key, session_id, nt):
+def threaded_crawler(app, key, session_id, nt):
     try:
         # 为每个线程创建应用上下文
         with app.app_context():
             
             # 执行爬取任务
-            crawler(key, session_id, nt)
+            crawler(app, key, session_id, nt)
             
     except Exception as e:
         # 捕获异常并记录
@@ -118,7 +124,7 @@ def get__result(session_id, question):
         for key in keys: #根据关键词爬取网站，结果以json返回
             thread = threading.Thread(
                 target=threaded_crawler, 
-                args=(key, session_id, nt)
+                args=(app, key, session_id, nt)
             )
             threads.append(thread)
             thread.start()
