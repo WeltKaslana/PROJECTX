@@ -1,154 +1,138 @@
-import { ref } from 'vue'
-import api from './api'
+import { ref } from 'vue';
+import api from './api';
 
 export const useChat = (username) => {
-  const conversations = ref([])
-  const currentConversation = ref(null)
-  const messages = ref([])
-  const loading = ref(false)
-  const error = ref(null)
+  const state = ref({
+    conversations: [],
+    currentConversation: null,
+    messages: [],
+    loading: false,
+    error: null
+  });
 
-
-
-
-  const fetchCurrentConversation = async () => {
-    try {
-      if (!username) throw new Error('用户名不存在');
-
-      const response = await api.getHistoryCount(username);
-      console.log('getHistoryCount response:', response);
-
-      if (response.code === 200) {
-        // 修复点1：正确处理数组和对象两种响应格式
-        const firstSession = Array.isArray(response.result)
-          ? response.result[0]?.sessionId
-          : response.result?.sessionId;
-
-        // 修复点2：添加默认值处理
-        currentConversation.value = firstSession || null;
-
-        if (!currentConversation.value) {
-          console.warn('No valid session found, will create new one');
-        }
-        return currentConversation.value;
-      }
-      throw new Error(response.reason || '获取当前对话失败');
-    } catch (err) {
-      console.error('fetchCurrentConversation error:', err);
-      throw err;
-    }
-  };
-
+  // 创建新会话
   const createNewChat = async () => {
     try {
-      loading.value = true;
-      const response = await api.newConversation(username);
-      console.log('createNewChat response:', response);
-
-      // 修复点3：统一result处理逻辑
-      currentConversation.value = response.result || null;
-
-      if (!currentConversation.value) {
-        throw new Error('创建会话失败：未返回有效sessionId');
+      state.value.loading = true;
+      const res = await api.createConversation(username);
+      
+      if (res.code === 200) {
+        state.value.currentConversation = res.result.session_id;
+        await fetchConversations();
+        return res.result;
       }
-
-      await fetchConversations();
-      return currentConversation.value;
-    } catch (err) {
-      console.error('createNewChat error:', err);
-      throw err;
+      throw new Error(res.reason || '创建失败');
     } finally {
-      loading.value = false;
+      state.value.loading = false;
     }
   };
 
+  // 获取会话列表
   const fetchConversations = async () => {
     try {
-      const response = await api.getHistoryCount(username);
-      if (response.code === 200) {
-        // 修复点4：确保总是更新currentConversation
-        const sessions = Array.isArray(response.result)
-          ? response.result
-          : [response.result];
-
-        if (sessions.length > 0 && !currentConversation.value) {
-          currentConversation.value = sessions[0].sessionId;
+      const res = await api.getConversations(username);
+      if (res.code === 200) {
+        state.value.conversations = res.result.map(conv => ({
+          id: conv.session_id,
+          title: conv.title || `对话 ${new Date(conv.created_at).toLocaleDateString()}`,
+          createdAt: conv.created_at
+        }));
+        
+        // 如果没有当前会话，设置第一个为当前
+        if (!state.value.currentConversation && res.result.length > 0) {
+          state.value.currentConversation = res.result[0].session_id;
         }
-
-        conversations.value = sessions.map(s => ({
-          id: s.sessionId,
-          title: new Date(s.createdAt).toLocaleString(),
-          createdAt: s.createdAt
-        })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       }
     } catch (err) {
-      console.error('fetchConversations error:', err);
+      state.value.error = err;
     }
   };
 
-  const loadHistory = async (sessionId) => {
-    try {
-      loading.value = true
-      const response = await api.getHistory(sessionId)
-      if (response.code === 200) {
-        messages.value = response.result
-        currentConversation.value = sessionId
-        return messages.value
-      }
-      throw new Error(response.reason || '加载历史记录失败')
-    } catch (err) {
-      error.value = err.reason || '加载历史记录失败'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 关键词搜索
+  // 分步搜索流程
   const searchKeywords = async (sessionId, question) => {
     try {
-      console.log('搜索参数:', { sessionId, question });
+      state.value.loading = true;
+      
+      // 步骤1：快速文本回复
+      const quickRes = await api.sendQuickReply(sessionId, question);
+      if (quickRes.code !== 200) throw new Error(quickRes.reason);
 
-      if (!sessionId) throw new Error('会话ID不存在');
-      if (!question) throw new Error('搜索内容不能为空');
-
-      loading.value = true;
-      const response = await api.searchKeywords(sessionId, question);
-      console.log('搜索响应:', response);
-
-      if (response.code !== 200) {
-        throw new Error(response.reason || '搜索失败');
-      }
-
-      // 标准化消息格式
-      const searchResult = {
+      // 添加临时消息
+      const tempMsg = {
         role: 'assistant',
-        content: response.result.tip || '为您找到以下结果:',
-        products: response.result.result || [],
-        timestamp: new Date().toISOString()
+        content: quickRes.result.message,
+        timestamp: new Date().toISOString(),
+        isLoading: true,
+        tempId: Date.now() // 用于后续定位
+      };
+      state.value.messages.push(tempMsg);
+
+      // 步骤2：异步获取商品数据
+      const fetchProducts = async () => {
+        try {
+          const productRes = await api.fetchProducts(sessionId);
+          if (productRes.code === 200) {
+            // 替换临时消息
+            const index = state.value.messages.findIndex(m => m.tempId === tempMsg.tempId);
+            if (index !== -1) {
+              state.value.messages[index] = {
+                role: 'assistant',
+                content: quickRes.result.message,
+                products: parseProductData(productRes.result),
+                timestamp: new Date().toISOString()
+              };
+            }
+          }
+        } catch (err) {
+          console.error('商品加载失败:', err);
+        }
       };
 
-      messages.value.push(searchResult);
-      return response;
+      // 延迟1秒获取商品（模拟后台处理）
+      setTimeout(fetchProducts, 1000);
+
+      return quickRes;
     } catch (err) {
-      error.value = err.message;
-      console.error('搜索失败:', err);
+      state.value.error = err;
       throw err;
     } finally {
-      loading.value = false;
+      state.value.loading = false;
     }
+  };
+
+  // 商品数据解析
+  const parseProductData = (items) => {
+    return items?.map(item => ({
+      id: item.id || `${item.page}_${item.position}`,
+      name: item.name || item.title,
+      price: item.price || 0,
+      image: formatImageUrl(item.img_url || item.image),
+      shop: item.shop || '官方旗舰店',
+      sales: formatSales(item.deals || item.sales),
+      link: formatProductLink(item.goods_url || item.link),
+      isPostFree: !!item.free_shipping
+    })) || [];
+  };
+
+  // 辅助方法
+  const formatImageUrl = (url) => {
+    if (!url) return '';
+    return url.startsWith('http') ? url : `https:${url}`;
+  };
+
+  const formatSales = (sales) => {
+    const num = parseInt(sales) || 0;
+    return num > 10000 ? `${(num/10000).toFixed(1)}万` : num;
+  };
+
+  const formatProductLink = (link) => {
+    return link?.startsWith('http') ? link : `https:${link}`;
   };
 
   return {
-    conversations,
-    currentConversation,
-    messages,
-    loading,
-    error,
+    ...state.value,
     createNewChat,
     fetchConversations,
-    loadHistory,
-    searchKeywords,
-    fetchCurrentConversation
-  }
-}
+    searchKeywords
+  };
+};

@@ -54,30 +54,35 @@ const ensureConversation = async () => {
 
 const handleSubmitMessage = async () => {
   if (!message.value.trim()) {
-    ElMessage.warning('请输入搜索内容')
-    return
+    ElMessage.warning('请输入搜索内容');
+    return;
   }
 
   try {
-    if (!user.value) {
-      await visitorLogin()
-    }
+    // 1. 确保用户已登录和会话有效
+    if (!user.value) await visitorLogin();
+    if (!currentConversation.value) await ensureConversation();
 
-    await ensureConversation()
+    // 2. 添加用户消息
+    messages.value.push({
+      role: 'user',
+      content: message.value,
+      timestamp: new Date().toISOString()
+    });
+
+    // 3. 清空输入框
+    const question = message.value;
+    message.value = '';
+
+    // 4. 执行搜索（会分两步响应）
+    await searchKeywords(currentConversation.value, question);
     
-    loading.value = true
-    const response = await searchKeywords(
-      currentConversation.value,
-      message.value
-    )
-    
-    message.value = ''
   } catch (error) {
-    ElMessage.error(`搜索失败: ${error.message}`)
-  } finally {
-    loading.value = false
+    ElMessage.error(`处理失败: ${error.message}`);
+    // 移除加载中的消息（如果有）
+    messages.value = messages.value.filter(m => !m.isLoading);
   }
-}
+};
 
 const parseProductData = (apiData) => {
   if (!apiData || !Array.isArray(apiData)) return []

@@ -1,76 +1,72 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://172.20.10.8:8080', // 后端API地址
-  timeout: 5000
+  baseURL: 'http://172.20.10.8:8080',
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 
-// 优化后的响应拦截器
+// 请求拦截器
+api.interceptors.request.use(config => {
+  console.log('请求参数:', config);
+  return config;
+}, error => {
+  return Promise.reject(error);
+});
+
+// 响应拦截器
 api.interceptors.response.use(
   response => {
-    // 直接返回response.data，保持与后端一致的结构
-    return response.data;
+    const res = response.data;
+    // 标准化响应格式
+    return {
+      code: res.code || 200,
+      message: res.message || 'success',
+      result: res.result ?? res.data,
+      timestamp: Date.now()
+    };
   },
   error => {
-    // 如果有响应数据，则返回它
-    if (error.response && error.response.data) {
-      return Promise.reject(error.response.data);
-    }
-    // 如果是网络错误等没有response的情况
+    console.error('API错误:', error);
     return Promise.reject({
-      code: error.code || 500,
-      message: error.message || '网络错误',
-      reason: '请求失败，请检查网络连接'
+      code: error.response?.status || 500,
+      message: error.response?.data?.message || '网络错误',
+      reason: error.response?.data?.reason || error.message
     });
   }
 );
 
-// API方法
 export default {
-  // 游客登录
+  // 用户认证
   visitorLogin() {
-    return api.get('/visitor');
+    return api.post('/visitor/login');
+  },
+  
+  // 会话管理
+  createConversation(username) {
+    return api.post('/conversations', { username });
+  },
+  
+  getConversations(username) {
+    return api.get(`/conversations?username=${username}`);
   },
 
-  // 用户注册
-  register(username, password) {
-    return api.get(`/register/${username}/${password}`);
+  // 消息交互
+  sendQuickReply(sessionId, question) {
+    return api.get(`/quick-reply/${sessionId}/${encodeURIComponent(question)}`);
   },
 
-  // 用户登录
-  login(username, password) {
-    return api.get(`/login/${username}/${password}`);
-  },
-
-  // 创建新对话
-  newConversation(username) {
-    return api.get(`/new/${username}`);
-  },
-
-  // 获取历史记录数
-  getHistoryCount(username) {
-    return api.get(`/historycount/${username}`);
-  },
-
-  // 获取历史记录
-  getHistory(sessionId) {
-    return api.get(`/history/${sessionId}`);
-  },
-
-  // 关键词查询
-  searchKeywords(sessionId, question) {
-    // 确保参数有效
-    if (!sessionId || typeof question === 'undefined') {
-      return Promise.reject(new Error('缺少必要参数'));
-    }
-
-    // 仅对question进行编码
-    const encodedQuestion = encodeURIComponent(question);
-    return api.get(`/keywords/${sessionId}/${encodedQuestion}`);
-
-  },
-    // 新增方法：获取商品卡片数据
-  fetchProductCards(sessionId) {
+  fetchProducts(sessionId) {
     return api.get(`/products/${sessionId}`);
+  },
+
+  // 搜索功能
+  searchKeywords(sessionId, question) {
+    return api.post('/search', {
+      session_id: sessionId,
+      question: question
+    });
   }
-}
+};
