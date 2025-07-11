@@ -59,28 +59,36 @@ const handleSubmitMessage = async () => {
   }
 
   try {
-    // 1. 确保用户已登录和会话有效
-    if (!user.value) await visitorLogin();
-    if (!currentConversation.value) await ensureConversation();
+    // 1. 确保用户已登录
+    if (!user.value) {
+      await visitorLogin();
+    }
 
-    // 2. 添加用户消息
-    messages.value.push({
-      role: 'user',
-      content: message.value,
-      timestamp: new Date().toISOString()
+    // 2. 确保有有效会话
+    if (!currentConversation.value) {
+      await fetchCurrentConversation();
+      if (!currentConversation.value) {
+        await createNewChat();
+      }
+    }
+
+    // 3. 记录调试信息
+    console.log('提交搜索:', {
+      sessionId: currentConversation.value,
+      question: message.value
     });
 
-    // 3. 清空输入框
-    const question = message.value;
-    message.value = '';
+    // 4. 执行搜索
+    loading.value = true;
+    await searchKeywords(currentConversation.value, message.value);
 
-    // 4. 执行搜索（会分两步响应）
-    await searchKeywords(currentConversation.value, question);
-    
+    // 5. 清空输入框
+    message.value = '';
   } catch (error) {
-    ElMessage.error(`处理失败: ${error.message}`);
-    // 移除加载中的消息（如果有）
-    messages.value = messages.value.filter(m => !m.isLoading);
+    console.error('提交消息失败:', error);
+    ElMessage.error(`搜索失败: ${error.message}`);
+  } finally {
+    loading.value = false;
   }
 };
 

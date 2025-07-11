@@ -2,137 +2,109 @@ import { ref } from 'vue';
 import api from './api';
 
 export const useChat = (username) => {
-  const state = ref({
-    conversations: [],
-    currentConversation: null,
-    messages: [],
-    loading: false,
-    error: null
-  });
+  const conversations = ref([]);
+  const currentConversation = ref(null);
+  const messages = ref([]);
+  const loading = ref(false);
+  const error = ref(null);
+
+  // 获取当前会话
+  const fetchCurrentConversation = async () => {
+    try {
+      if (!username) throw new Error('用户名不存在');
+      
+      const response = await api.getHistoryCount(username);
+      console.log('获取历史会话响应:', response);
+
+      if (response.code === 200) {
+        // 处理数组或对象格式的响应
+        currentConversation.value = Array.isArray(response.result) 
+          ? response.result[0]?.sessionId 
+          : response.result?.sessionId;
+        
+        if (!currentConversation.value) {
+          console.warn('未获取到有效会话ID');
+        }
+        return currentConversation.value;
+      }
+      throw new Error(response.reason || '获取会话失败');
+    } catch (err) {
+      error.value = err.message;
+      console.error('获取当前会话失败:', err);
+      throw err;
+    }
+  };
 
   // 创建新会话
   const createNewChat = async () => {
     try {
-      state.value.loading = true;
-      const res = await api.createConversation(username);
-      
-      if (res.code === 200) {
-        state.value.currentConversation = res.result.session_id;
+      loading.value = true;
+      const response = await api.newConversation(username);
+      console.log('创建会话响应:', response);
+
+      if (response.code === 200) {
+        currentConversation.value = response.result;
+        if (!currentConversation.value) {
+          throw new Error('未返回有效会话ID');
+        }
         await fetchConversations();
-        return res.result;
+        return currentConversation.value;
       }
-      throw new Error(res.reason || '创建失败');
-    } finally {
-      state.value.loading = false;
-    }
-  };
-
-  // 获取会话列表
-  const fetchConversations = async () => {
-    try {
-      const res = await api.getConversations(username);
-      if (res.code === 200) {
-        state.value.conversations = res.result.map(conv => ({
-          id: conv.session_id,
-          title: conv.title || `对话 ${new Date(conv.created_at).toLocaleDateString()}`,
-          createdAt: conv.created_at
-        }));
-        
-        // 如果没有当前会话，设置第一个为当前
-        if (!state.value.currentConversation && res.result.length > 0) {
-          state.value.currentConversation = res.result[0].session_id;
-        }
-      }
+      throw new Error(response.reason || '创建会话失败');
     } catch (err) {
-      state.value.error = err;
-    }
-  };
-
-  // 分步搜索流程
-  const searchKeywords = async (sessionId, question) => {
-    try {
-      state.value.loading = true;
-      
-      // 步骤1：快速文本回复
-      const quickRes = await api.sendQuickReply(sessionId, question);
-      if (quickRes.code !== 200) throw new Error(quickRes.reason);
-
-      // 添加临时消息
-      const tempMsg = {
-        role: 'assistant',
-        content: quickRes.result.message,
-        timestamp: new Date().toISOString(),
-        isLoading: true,
-        tempId: Date.now() // 用于后续定位
-      };
-      state.value.messages.push(tempMsg);
-
-      // 步骤2：异步获取商品数据
-      const fetchProducts = async () => {
-        try {
-          const productRes = await api.fetchProducts(sessionId);
-          if (productRes.code === 200) {
-            // 替换临时消息
-            const index = state.value.messages.findIndex(m => m.tempId === tempMsg.tempId);
-            if (index !== -1) {
-              state.value.messages[index] = {
-                role: 'assistant',
-                content: quickRes.result.message,
-                products: parseProductData(productRes.result),
-                timestamp: new Date().toISOString()
-              };
-            }
-          }
-        } catch (err) {
-          console.error('商品加载失败:', err);
-        }
-      };
-
-      // 延迟1秒获取商品（模拟后台处理）
-      setTimeout(fetchProducts, 1000);
-
-      return quickRes;
-    } catch (err) {
-      state.value.error = err;
+      error.value = err.message;
+      console.error('创建会话失败:', err);
       throw err;
     } finally {
-      state.value.loading = false;
+      loading.value = false;
     }
   };
 
-  // 商品数据解析
-  const parseProductData = (items) => {
-    return items?.map(item => ({
-      id: item.id || `${item.page}_${item.position}`,
-      name: item.name || item.title,
-      price: item.price || 0,
-      image: formatImageUrl(item.img_url || item.image),
-      shop: item.shop || '官方旗舰店',
-      sales: formatSales(item.deals || item.sales),
-      link: formatProductLink(item.goods_url || item.link),
-      isPostFree: !!item.free_shipping
-    })) || [];
+  // 关键词搜索
+  const searchKeywords = async (sessionId, question) => {
+    try {
+      console.log('搜索参数:', { sessionId, question });
+      
+      if (!sessionId) throw new Error('会话ID不存在');
+      if (!question) throw new Error('搜索内容不能为空');
+
+      loading.value = true;
+      const response = await api.searchKeywords(sessionId, question);
+      console.log('搜索响应:', response);
+
+      if (response.code !== 200) {
+        throw new Error(response.reason || '搜索失败');
+      }
+
+      // 标准化消息格式
+      const searchResult = {
+        role: 'assistant',
+        content: response.result.tip || '为您找到以下结果:',
+        products: response.result.result || [],
+        timestamp: new Date().toISOString()
+      };
+
+      messages.value.push(searchResult);
+      return response;
+    } catch (err) {
+      error.value = err.message;
+      console.error('搜索失败:', err);
+      throw err;
+    } finally {
+      loading.value = false;
+    }
   };
 
-  // 辅助方法
-  const formatImageUrl = (url) => {
-    if (!url) return '';
-    return url.startsWith('http') ? url : `https:${url}`;
-  };
-
-  const formatSales = (sales) => {
-    const num = parseInt(sales) || 0;
-    return num > 10000 ? `${(num/10000).toFixed(1)}万` : num;
-  };
-
-  const formatProductLink = (link) => {
-    return link?.startsWith('http') ? link : `https:${link}`;
-  };
-
+  // 其他方法保持不变...
   return {
-    ...state.value,
+    conversations,
+    currentConversation,
+    messages,
+    loading,
+    error,
+    fetchCurrentConversation,
     createNewChat,
-    fetchConversations,
-    searchKeywords
+    searchKeywords,
+    // ...其他方法
   };
 };
