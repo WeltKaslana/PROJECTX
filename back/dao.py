@@ -71,7 +71,8 @@ class userDAO():
 
     def add_goods(session_id: str, name: str, price: float, img_url: str, shop_url: str, goods_url: str, deals: int):
         db.session.add(Goods(session_id=session_id, name=name, price=price, img_url=img_url, shop_url=shop_url, goods_url=goods_url, deals=deals))
-    
+        db.session.commit()
+
     def find_goods(session_id: str):
         query_res = Goods.query.filter_by(session_id=session_id).all()
         goods = []

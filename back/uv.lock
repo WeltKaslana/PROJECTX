@@ -56,6 +56,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pymysql" },
     { name = "pyquery" },
+    { name = "requests" },
     { name = "selenium" },
     { name = "waitress" },
 ]
@@ -75,6 +76,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "pymysql", specifier = ">=1.1.1" },
     { name = "pyquery", specifier = ">=2.0.1" },
+    { name = "requests", specifier = ">=2.32.4" },
     { name = "selenium", specifier = ">=4.34.2" },
     { name = "waitress", specifier = ">=3.0.2" },
 ]

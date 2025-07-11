@@ -27,7 +27,8 @@
                         </el-icon>
                     </el-button>
                 </el-tooltip>
-                <el-button type="primary" @click="emit('submit-message')" :disabled="!inputValue.trim() || chatLoading"
+                <el-button type="primary" @click="emit('submit-message')" 
+                    :disabled="!inputValue.trim() || chatLoading || agentLoading"
                     :loading="chatLoading" class="send-button">
                     发送
                     <el-icon class="el-icon--right">
@@ -40,6 +41,10 @@
         <div class="input-footer">
             <small>AI助手可能会出错，请核对重要信息</small>
             <small v-if="chatLoading">AI正在思考中，请稍候...</small>
+            <!-- 新增agent错误提示 -->
+            <small v-if="agentError" class="agent-error">
+                助手服务异常: {{ agentError }}
+            </small>
         </div>
     </div>
 </template>
@@ -57,6 +62,14 @@ const props = defineProps({
     chatLoading: {
         type: Boolean,
         default: false
+    },
+    agentLoading: {  // 新增agent加载状态
+        type: Boolean,
+        default: false
+    },
+    agentError: {    // 新增agent错误信息
+        type: String,
+        default: ''
     },
     user: {
         type: Object,
@@ -79,6 +92,19 @@ watch(() => props.modelValue, (newVal) => {
     inputValue.value = newVal
 })
 
+// 监听agent错误变化
+watch(() => props.agentError, (newError) => {
+    if (newError) {
+        // 当有错误时自动滚动到底部以便用户看到
+        nextTick(() => {
+            const container = document.querySelector('.chat-history')
+            if (container) {
+                container.scrollTop = container.scrollHeight
+            }
+        })
+    }
+})
+
 // 更新父组件的值
 watch(inputValue, (newVal) => {
     emit('update:modelValue', newVal)
@@ -91,10 +117,19 @@ const clearMessage = () => {
 }
 
 // 处理键盘事件
+// const handleKeydown = (e) => {
+//     if (e.key === 'Enter' && !e.shiftKey) {
+//         e.preventDefault()
+//         emit('submit-message')
+//     }
+// }
 const handleKeydown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
         emit('submit-message')
+    } else if (e.key === 'Enter' && e.shiftKey) {
+        e.preventDefault()
+        emit('new-line')
     }
 }
 
@@ -217,9 +252,21 @@ const focusInput = () => {
     font-size: 0.75em;
 }
 
+/* 新增agent错误提示样式 */
+.agent-error {
+    color: #ff4d4f;
+    font-weight: 500;
+    margin-top: 4px; /* 与上方内容保持距离 */
+}
+
 @media (max-width: 480px) {
     .message-input {
         font-size: 14px;
+    }
+
+    .input-footer {
+        flex-direction: column;
+        align-items: flex-start;
     }
 }
 </style>
