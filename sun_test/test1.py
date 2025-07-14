@@ -43,5 +43,10 @@ chain2 = prompt | llm | parser
 
 ch = {"1": chain, "2": chain2}
 
+# example
+# ch = {}
+# for i in ...:
+#     ch[i.name] = chain
+
 chain3 = RunnableParallel(**ch)
 print(chain3.invoke({"query": "给我讲个有关程序员的笑话"}))
