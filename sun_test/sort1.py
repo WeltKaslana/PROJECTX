@@ -80,9 +80,10 @@ class InMemoryHistory(BaseChatMessageHistory, BaseModel):
 
 def ai_sort_products(
     session_id: str,
+    question: str,
+    key: str,
     products: List[dict],
     user_preferences: Optional[str] = None,
-
 ) -> List[Product]:
     """
     完整商品信息排序函数
@@ -90,6 +91,10 @@ def ai_sort_products(
     :param products: 包含完整商品信息的字典列表
     :return: 包含所有原始字段的Product对象列表
     """
+    
+    #  原始数据
+    # products = find_goods(session_id, key)
+    
     # 数据校验
     required_fields = ["name", "price", "deals", "img_url", "goods_url", "shop_url"]
     for i, p in enumerate(products):
@@ -110,6 +115,7 @@ def ai_sort_products(
     
     {history_prompt}  # 多轮对话时引入历史偏好
     {current_preferences}  # 当前轮次的用户偏好
+    用户的需求为：{question}
 
     
     排序参考维度（需综合或侧重）：
@@ -140,7 +146,7 @@ def ai_sort_products(
     if user_preferences:
         current_preferences = f"当前用户偏好：{user_preferences}（请优先满足）"
     else:
-        current_preferences = "当前无特殊偏好，默认按「销量*0.6 + 价格*0.4」综合排序"
+        current_preferences = "当前无特殊偏好，默认按销量越高越好，价格越低越好的综合排序"
 
     # 格式化商品信息（简略显示）
     products_str = "\n".join([
@@ -152,15 +158,13 @@ def ai_sort_products(
     parser = PydanticOutputParser(pydantic_object=SortedProducts)
     prompt = PromptTemplate(
         template=prompt_template,
-        input_variables=["products", "history_prompt", "current_preferences"],
+        input_variables=["products", "history_prompt", "current_preferences", "question"],
         partial_variables={"format_instructions": parser.get_format_instructions()}
     )
 
     chain = prompt | llm | parser
-    def get_session_history(session_id: str) -> BaseChatMessageHistory:
-        temp = InMemoryHistory()
-        temp.add_messages(redis_history.messages)
-        return temp
+    def get_session_history(session_id: str) -> RedisChatMessageHistory:
+        return redis_history
 
     chain_with_history = RunnableWithMessageHistory(
         chain,
@@ -176,6 +180,7 @@ def ai_sort_products(
                 "products": products_str,
                 "history_prompt": history_prompt,
                 "current_preferences": current_preferences,
+                "question": question,
             },
             config={"configurable": {"session_id": session_id}}
         )
@@ -187,7 +192,7 @@ def ai_sort_products(
     ai_msg = f"排序规则：{result.sorting_rules}（输出{len(result.sorted_products)}件）"
     redis_history.add_user_message(user_msg)
     redis_history.add_ai_message(ai_msg)
-
+    
     # 将原始数据映射到结果中
     final_products = []
     name_to_original = {p["name"]: p for p in products}
@@ -206,6 +211,14 @@ def ai_sort_products(
     
     return final_products
 
+
+def ai_delete_history(session_id:str):
+    history = RedisChatMessageHistory(
+        redis_url = "redis://47.98.143.59:6379",# Redis 连接URL
+        session_id = session_id, # 会话ID
+    )
+    history.clear()  # 清除聊天历史
+
 # 使用示例
 if __name__ == "__main__":
     test_product = {
@@ -222,16 +235,26 @@ if __name__ == "__main__":
                     {**test_product, 'name': 'iPhone 15', 'price': 5999, 'deals': 50000},
                     {**test_product, 'name': '小米14', 'price': 3999, 'deals': 80000}]
     
+    ai_delete_history("test_session")
+    # print("history:\n",ai_get_history("test_session"))  # 打印当前历史消息
     # 执行排序
-    sorted_results = ai_sort_products("test_session", test_products, "性价比优先")
+    sorted_results = ai_sort_products(
+        session_id="test_session", 
+        question="请帮我推荐几款性价比高的手机",
+        key="手机 5G",
+        products=test_products)
     
     # 打印完整结果
-    for i, product in enumerate(sorted_results, 1):
-        print(f"\n=== 第{i}名 ===")
-        print(f"名称: {product.name}")
-        print(f"价格: {product.price}")
-        print(f"销量: {product.deals}")
-        print(f"图片: {product.img_url}")
-        print(f"商品链接: {product.goods_url}")
-        print(f"店铺链接: {product.shop_url}")
+    # for i, product in enumerate(sorted_results, 1):
+    #     print(f"\n=== 第{i}名 ===")
+    #     print(f"名称: {product.name}")
+    #     print(f"价格: {product.price}")
+    #     print(f"销量: {product.deals}")
+    #     print(f"图片: {product.img_url}")
+    #     print(f"商品链接: {product.goods_url}")
+    #     print(f"店铺链接: {product.shop_url}")
+    
+    print("历史消息：") # 显示当前历史消息
+    for i in ai_get_history("test_session"):
+        print("说话对象：", i.type,"交流内容：" , i.content) # 打印每条消息的类型和内容
 

@@ -4,13 +4,14 @@ from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_deepseek import ChatDeepSeek
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_redis import RedisChatMessageHistory
 # from langchain_core.runnables import RunnableParallel
 from langchain_core.runnables.history import RunnableWithMessageHistory 
 from langchain_core.output_parsers import StrOutputParser # 导⼊字符串输出解析器
 import os
 from dotenv import load_dotenv
+from dao import userDAO
 
 # 加载环境变量
 load_dotenv()
@@ -34,13 +35,14 @@ llm = ChatDeepSeek(
 #     timeout=180,#增加请求超时限制
 # )
 
-# 数据模型定义
+# 完整商品数据模型
 class Product(BaseModel):
     name: str = Field(..., description="商品名称")
-    price: float = Field(..., description="商品价格，数值类型")
-    # rating: float = Field(..., description="用户评分，1-5之间的数值")
-    sales: int = Field(..., description="销量，整数类型")
-    # 可扩展其他属性：品牌、库存等
+    price: float = Field(..., description="商品价格")
+    deals: int = Field(..., description="销量")
+    img_url: str = Field(..., description="商品图片URL")
+    goods_url: str = Field(..., description="商品详情页URL")
+    shop_url: str = Field(..., description="店铺URL")
 
 
 class SortedProducts(BaseModel):
@@ -84,7 +86,11 @@ class InMemoryHistory(BaseChatMessageHistory, BaseModel):
                 else:
                     raise ValueError(f"不支持的消息类型: {type(msg)}")
         self.messages.extend(validated_messages)
-
+    def add_message(self, message):
+        if str(message.type) == "human":
+            self.messages.append(HumanMessage(content=message.content))
+        elif str(message.type) == "ai":
+            self.messages.append(AIMessage(content=message.content))
     def clear(self) -> None:
         self.messages = []
 
@@ -122,14 +128,19 @@ def ai_get_keywords(session_id:str, question: str):
         session_id = session_id, # 会话ID
     )
     # 转换函数
-    def get_by_session_id(session_id:str) -> BaseChatMessageHistory:
-        temp = InMemoryHistory()
-        temp.add_messages(redis_history.messages)  # 将Redis消息添加到临时内存历史中
-        return temp
+    # def get_session_history(session_id: str) -> BaseChatMessageHistory:
+    #     temp = InMemoryHistory()
+    #     for message in redis_history.messages:
+    #         # print("说话对象：", message.type,"交流内容：" , message.content, "类型：", message.name)  # 打印每条消息的类型和内容
+    #         temp.add_message(message)
+    #     return temp
+    def get_session_history(session_id: str) -> RedisChatMessageHistory:
+        return redis_history
+        
     # 创建⼀个带有消息历史的可运⾏对象
     chain_with_history  = RunnableWithMessageHistory(
         chain,# 基础链
-        get_by_session_id,
+        get_session_history,
         input_messages_key="question",  # 指定输⼊消息的键为"question"
         history_messages_key="history", # 指定历史消息的键为"history"
     )
@@ -158,57 +169,55 @@ def ai_delete_history(session_id:str):
 def ai_recommend(
     session_id: str,
     question: str,
-    keys: List[str],
-    products: List[dict],
+    key: str,
+    # products: List[dict],
     user_preferences: Optional[str] = None,
-    top_n: int = 5  # 新增：默认输出前五名
 ) -> List[Product]:
     """
-    对商品列表进行智能排序，支持指定输出数量和追加偏好调整
+    完整商品信息排序函数
     
-    :param session_id: 会话ID（用于存储历史，支持多轮调整）
-    :param products: 商品列表（含name, price, rating, sales等字段）
-    :param user_preferences: 用户偏好（可选，如"更看重性价比"）
-    :param top_n: 输出的商品数量（默认5，用户可指定）
-    :return: 排序后的商品列表（前N名）
+    :param products: 包含完整商品信息的字典列表
+    :return: 包含所有原始字段的Product对象列表
     """
-    # 1. 数据校验：确保商品属性完整
-    # required_fields = ["name", "price", "rating", "sales"]
-    required_fields = ["name", "price", "sales"]
+    
+    #  原始数据
+    products = userDAO.find_goods(session_id, key)
+    
+    # 数据校验
+    required_fields = ["name", "price", "deals", "img_url", "goods_url", "shop_url"]
     for i, p in enumerate(products):
         missing = [f for f in required_fields if f not in p]
         if missing:
             raise ValueError(f"商品{i+1}缺少必要字段：{missing}")
 
-    # 2. 构建输出解析器（严格约束格式）
     parser = PydanticOutputParser(pydantic_object=SortedProducts)
 
-    # 3. 构建提示词模板（增强多轮调整和数量控制）
+    # 构建提示词（简化版，重点在完整输出）
     prompt_template = """
     你是专业的商品排序助手，需根据商品信息和用户需求完成以下任务：
     1. 对商品进行排序（支持多轮调整，可参考历史偏好）
-    2. 仅输出前{top_n}名商品
-    3. 清晰说明排序规则（尤其是用户偏好的体现）
+    2. 清晰说明排序规则（尤其是用户偏好的体现）
 
-    商品信息：
+    商品列表：
     {products}
-
+    
     {history_prompt}  # 多轮对话时引入历史偏好
     {current_preferences}  # 当前轮次的用户偏好
+    用户的需求为：{question}
 
+    
     排序参考维度（需综合或侧重）：
     - 价格（越低越优）
     - 销量（越高越优，反映大众认可度）
     - 用户明确偏好（如指定则优先满足）
 
     输出要求：
-    - 严格返回前{top_n}名商品，不可多不可少
-    - 排序规则需具体（例如："因用户看重性价比，按评分/价格降序排列"）
-    - 若商品总数不足{top_n}，则全部返回并说明
+    - 排序规则需具体
+    - 输出数据要完整全面
 
     {format_instructions}
     """
-
+    
     # 4. 处理历史对话（支持追加偏好调整）
     redis_history = RedisChatMessageHistory(
         redis_url="redis://47.98.143.59:6379",
@@ -225,29 +234,25 @@ def ai_recommend(
     if user_preferences:
         current_preferences = f"当前用户偏好：{user_preferences}（请优先满足）"
     else:
-        # current_preferences = "当前无特殊偏好，默认按「评分*0.4 + 销量*0.3 + 性价比*0.3」综合排序"
-        current_preferences = "当前无特殊偏好，默认按销量越高越好，价格越低越好综合排序"
+        current_preferences = "当前无特殊偏好，默认按销量越高越好，价格越低越好的综合排序"
 
-    # 6. 格式化提示词
+    # 格式化商品信息（简略显示）
+    products_str = "\n".join([
+        f"{i+1}. {p['name']} | 价格：{p['price']} | 销量：{p['deals']}"
+        for i, p in enumerate(products)
+    ])
+    
+    # 构建处理链
+    parser = PydanticOutputParser(pydantic_object=SortedProducts)
     prompt = PromptTemplate(
         template=prompt_template,
-        input_variables=["products", "history_prompt", "current_preferences", "top_n"],
+        input_variables=["products", "history_prompt", "current_preferences", "question"],
         partial_variables={"format_instructions": parser.get_format_instructions()}
     )
 
-    # 7. 商品信息格式化（避免长文本冗余）
-    products_str = "\n".join([
-        f"{i+1}. 名称：{p['name']}，价格：{p['price']}，销量：{p['sales']}"
-        for i, p in enumerate(products)
-    ])
-
-    # 8. 构建带历史的处理链
     chain = prompt | llm | parser
-
-    def get_session_history(session_id: str) -> BaseChatMessageHistory:
-        temp = InMemoryHistory()
-        temp.add_messages(redis_history.messages)
-        return temp
+    def get_session_history(session_id: str) -> RedisChatMessageHistory:
+        return redis_history
 
     chain_with_history = RunnableWithMessageHistory(
         chain,
@@ -256,27 +261,43 @@ def ai_recommend(
         history_messages_key="history_prompt"  # 绑定历史消息为历史键
     )
 
-    # 9. 调用模型获取排序结果
+    # 调用模型
     try:
         result = chain_with_history.invoke(
             input={
                 "products": products_str,
                 "history_prompt": history_prompt,
                 "current_preferences": current_preferences,
-                "top_n": top_n
+                "question": question,
             },
             config={"configurable": {"session_id": session_id}}
         )
     except Exception as e:
         raise RuntimeError(f"排序失败：{str(e)}")
-
+    
     # 10. 保存本轮对话到历史（便于后续调整）
-    user_msg = f"请求排序（前{top_n}名），偏好：{user_preferences or '无'}"
+    user_msg = f"请求排序（），偏好：{user_preferences or '无'}"
     ai_msg = f"排序规则：{result.sorting_rules}（输出{len(result.sorted_products)}件）"
     redis_history.add_user_message(user_msg)
     redis_history.add_ai_message(ai_msg)
-
-    return result.sorted_products
+    
+    # 将原始数据映射到结果中
+    final_products = []
+    name_to_original = {p["name"]: p for p in products}
+    
+    for sorted_p in result.sorted_products:
+        original = name_to_original.get(sorted_p.name)
+        if original:
+            final_products.append(Product(
+                name=original["name"],
+                price=original["price"],
+                deals=original["deals"],
+                img_url=original["img_url"],
+                goods_url=original["goods_url"],
+                shop_url=original["shop_url"],
+            ))
+    
+    return final_products
 
 
 
@@ -312,17 +333,68 @@ def ai_recommend(
     # for i, p in enumerate(sorted3, 1):
     #     print(f"{i}. {p.name} - 价格：{p.price}，销量：{p.sales}")
     
-    # # 测试4：多轮调整（基于历史偏好）
+    # # 测试4：回调测试
+    # redis_history = RedisChatMessageHistory(
+    #     redis_url="redis://47.98.143.59:6379",
+    #     session_id="user_1"
+    # )
+    # def get_session_history(session_id: str) -> BaseChatMessageHistory:
+    #     temp = InMemoryHistory()
+    #     for message in redis_history.messages:
+    #         print("说话对象：", message.type,"交流内容：" , message.content, "类型：", message.name)  # 打印每条消息的类型和内容
+    #         temp.add_message(message)
+    #     return temp
+    # print("get_by_session_id:")  # 打印转换后的历史消息
+    # for i in get_session_history("user_1").messages:
+    #     print("说话对象：", i.type,"交流内容：" , i.content, "类型：", i.name)  # 打印每条消息的类型和内容
+    
+    # # 测试5：多轮调整（基于历史偏好）
     # ai_delete_history("user_1") # 清除历史记录
     # print("处理请求中。。。")
     # print(ai_get_keywords("user_1", "我想买个戴在手上的")) # 测试函数
-    # # print("按1继续")
-    # # if input() == "1":
     # print("处理请求中。。。")
     # print(ai_get_keywords("user_1", "最好是金色的"))
-    # # print("按2继续")
-    # # if input() == "2":
     # print("处理请求中。。。")
     # print("历史消息：") # 显示当前历史消息
     # for i in ai_get_history("user_1"):
+    #     print("说话对象：", i.type,"交流内容：" , i.content) # 打印每条消息的类型和内容
+    
+    # # 测试6：完整商品信息排序
+    # test_product = {
+    #     'name': '【政府补贴15%】HONOR/荣耀200 5G手机 5200mAh青海湖电池5000万三主摄写真相机荣耀绿洲 护眼屏官方旗舰店100 5G 手机',
+    #     'price': 1410.15,
+    #     'deals': 70000,
+    #     'img_url': 'https://g-search3.alicdn.com/img/bao/uploaded/i4/i4/1114511827/O1CN01pYspum1PMog8RZ6Ze_!!4611686018427386323-0-item_pic.jpg_580x580q90.jpg_.webp',
+    #     'goods_url': '//detail.tmall.com/item.htm?priceTId=2147818d17521394102321658e1c75&utparam=%7B%22aplus_abtest%22%3A%2256498aa96c581f213f393002730bc35f%22%7D&id=789770187657&ns=1&abbucket=20&xxc=taobaoSearch&detail_redpacket_pop=true&query=%E6%89%8B%E6%9C%BA%205G&mi_id=MgoS6nP-gUWyQU8KRHWWoIOTsMQOKTczL27npuUTMCI_TYgNAvxxu0-4L-m6dG-ty-myroJvH9haNbjdX5Oy0jj7hogeQmFLiUV09xFRj-s&skuId=5890259858259&spm=a21n57.1.item.49',
+    #     'shop_url': '//store.taobao.com/shop/view_shop.htm?appUid=RAzN8HWJa6UWaRALcQM7yQ91BruC69N5os3Q6hgqbEP6bxEp16h&spm=a21n57.1.item.49' 
+    # }
+    
+    # # 模拟多个商品
+    # test_products = [test_product, 
+    #                 {**test_product, 'name': 'iPhone 15', 'price': 5999, 'deals': 50000},
+    #                 {**test_product, 'name': '小米14', 'price': 3999, 'deals': 80000}]
+    
+    # ai_delete_history("test_session")
+    # # print("history:\n",ai_get_history("test_session"))  # 打印当前历史消息
+    # # 执行排序
+    # sorted_results = ai_recommend(
+    #     session_id="test_session", 
+    #     question="请帮我推荐几款性价比高的手机",
+    #     key="手机 5G",
+    #     products=test_products)
+    
+    # # 打印完整结果
+    # print(f"推荐结果:")
+    # for i, product in enumerate(sorted_results, 1):
+    #     print(f"\n=== 第{i}名 ===")
+    #     print(f"名称: {product.name}")
+    #     print(f"价格: {product.price}")
+    #     print(f"销量: {product.deals}")
+    #     print(f"图片: {product.img_url}")
+    #     print(f"商品链接: {product.goods_url}")
+    #     print(f"店铺链接: {product.shop_url}")
+    
+    # print("\n")
+    # print("历史消息：") # 显示当前历史消息
+    # for i in ai_get_history("test_session"):
     #     print("说话对象：", i.type,"交流内容：" , i.content) # 打印每条消息的类型和内容
