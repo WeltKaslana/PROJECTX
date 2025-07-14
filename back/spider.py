@@ -104,13 +104,13 @@ def load_taobao_valid_cookies():
     # handle_taobao_notification_popup(driver)
 
     try:
-        # 检测快速登录按钮并点击
+        #检测快速登录按钮并点击
         # fast_login_btn = WebDriverWait(driver, 15).until(
         #     EC.element_to_be_clickable((By.CSS_SELECTOR, "button.fm-button.fm-submit"))
         # )
         # fast_login_btn.click()
 
-        # # 点击后再次处理可能出现的弹窗
+        # 点击后再次处理可能出现的弹窗
         # handle_taobao_notification_popup(driver)
 
         # 验证登录成功
@@ -223,7 +223,7 @@ def load_jd_valid_cookies():
             continue
 
     # 访问京东"我的主页"验证登录
-    driver.get(JD_HOME_URL)
+    driver.get(JD_MY_URL)
 
     try:
         # 验证登录成功（京东"我的订单"元素）
@@ -679,7 +679,7 @@ def jd_get_goods(driver, page, session_id, KEYWORD, nt):
     return jd_goods_list
 
 # 保存json文件
-def save_json_result(data, session_id):
+def save_json_result(data, session_id,key):
     """保存爬取结果到JSON文件"""
     try:
         # 创建保存目录（如果不存在）
@@ -688,7 +688,7 @@ def save_json_result(data, session_id):
 
         # 生成文件名（使用session_id和时间戳确保唯一性）
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_name = f"{output_dir}/result_{session_id}_{timestamp}.json"
+        file_name = f"{output_dir}/result_{key}_{session_id}_{timestamp}.json"
 
         # 写入JSON文件（使用UTF-8编码防止中文乱码）
         with open(file_name, "w", encoding="utf-8") as f:
@@ -711,9 +711,9 @@ def crawler(app, keys, session_id, nt):
         print(f"开始爬取组合关键词: {keys}")
 
         # 获取淘宝登录后的浏览器实例
-        taobao_driver = load_taobao_valid_cookies()
+        # taobao_driver = load_taobao_valid_cookies()
         # 获取京东登录后的浏览器实例
-        # jd_driver = load_jd_valid_cookies()
+        jd_driver = load_jd_valid_cookies()
 
         # 定义线程函数
         def taobao_crawl():
@@ -733,23 +733,23 @@ def crawler(app, keys, session_id, nt):
         threads = []
 
         # 创建线程
-        taobao_thread = threading.Thread(target=taobao_crawl)
-        # jd_thread = threading.Thread(target=jingdong_crawl)
+        # taobao_thread = threading.Thread(target=taobao_crawl)
+        jd_thread = threading.Thread(target=jingdong_crawl)
 
-        threads.append(taobao_thread)
-        # threads.append(jd_thread)
+        # threads.append(taobao_thread)
+        threads.append(jd_thread)
 
         # 启动线程
-        taobao_thread.start()
-        # jd_thread.start()
+        # taobao_thread.start()
+        jd_thread.start()
 
         # 等待线程完成
         for thread in threads:
             thread.join()
 
         # 关闭浏览器
-        taobao_driver.quit()
-        # jd_driver.quit()
+        # taobao_driver.quit()
+        jd_driver.quit()
 
     # 构建返回结果
     result_data = {
@@ -758,8 +758,9 @@ def crawler(app, keys, session_id, nt):
         "goods": goods_list
     }
 
+    key = result_data["keywords"]
     # 保存JSON文件
-    save_json_result(result_data, session_id)
+    save_json_result(result_data, session_id,key)
 
     # 返回JSON字符串
     # return json.dumps(result_data, ensure_ascii=False, indent=2)
