@@ -128,7 +128,7 @@ class userDAO():
     #         goods.append(good_data)
     #     return goods
 
-    def find_goods(session_id: str, keyword: str):
+    def find_goods(self, session_id: str, keyword: str):
         subquery = db.session.query(
             func.max(Goods.talk_id)
         ).filter_by(session_id=session_id, keyword=keyword).scalar_subquery()

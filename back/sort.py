@@ -6,6 +6,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_deepseek import ChatDeepSeek
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_redis import RedisChatMessageHistory
+# from langchain_core.runnables import RunnableParallel
 from langchain_core.runnables.history import RunnableWithMessageHistory 
 from langchain_core.output_parsers import StrOutputParser # 导⼊字符串输出解析器
 import os
@@ -37,7 +38,7 @@ llm = ChatDeepSeek(
 class Product(BaseModel):
     name: str = Field(..., description="商品名称")
     price: float = Field(..., description="商品价格，数值类型")
-    rating: float = Field(..., description="用户评分，1-5之间的数值")
+    # rating: float = Field(..., description="用户评分，1-5之间的数值")
     sales: int = Field(..., description="销量，整数类型")
     # 可扩展其他属性：品牌、库存等
 
@@ -154,8 +155,10 @@ def ai_delete_history(session_id:str):
     )
     history.clear()  # 清除聊天历史
 
-def ai_sort_products(
+def ai_recommend(
     session_id: str,
+    question: str,
+    keys: List[str],
     products: List[dict],
     user_preferences: Optional[str] = None,
     top_n: int = 5  # 新增：默认输出前五名
@@ -170,7 +173,8 @@ def ai_sort_products(
     :return: 排序后的商品列表（前N名）
     """
     # 1. 数据校验：确保商品属性完整
-    required_fields = ["name", "price", "rating", "sales"]
+    # required_fields = ["name", "price", "rating", "sales"]
+    required_fields = ["name", "price", "sales"]
     for i, p in enumerate(products):
         missing = [f for f in required_fields if f not in p]
         if missing:
@@ -193,8 +197,7 @@ def ai_sort_products(
     {current_preferences}  # 当前轮次的用户偏好
 
     排序参考维度（需综合或侧重）：
-    - 性价比（评分/价格比值）
-    - 用户评分（越高越优）
+    - 价格（越低越优）
     - 销量（越高越优，反映大众认可度）
     - 用户明确偏好（如指定则优先满足）
 
@@ -222,7 +225,8 @@ def ai_sort_products(
     if user_preferences:
         current_preferences = f"当前用户偏好：{user_preferences}（请优先满足）"
     else:
-        current_preferences = "当前无特殊偏好，默认按「评分*0.4 + 销量*0.3 + 性价比*0.3」综合排序"
+        # current_preferences = "当前无特殊偏好，默认按「评分*0.4 + 销量*0.3 + 性价比*0.3」综合排序"
+        current_preferences = "当前无特殊偏好，默认按销量越高越好，价格越低越好综合排序"
 
     # 6. 格式化提示词
     prompt = PromptTemplate(
@@ -233,7 +237,7 @@ def ai_sort_products(
 
     # 7. 商品信息格式化（避免长文本冗余）
     products_str = "\n".join([
-        f"{i+1}. 名称：{p['name']}，价格：{p['price']}，评分：{p['rating']}，销量：{p['sales']}"
+        f"{i+1}. 名称：{p['name']}，价格：{p['price']}，销量：{p['sales']}"
         for i, p in enumerate(products)
     ])
 

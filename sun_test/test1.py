@@ -3,6 +3,7 @@ from pydantic import BaseModel,Field,model_validator
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_deepseek import ChatDeepSeek
+from langchain_core.runnables import RunnableParallel
 import os
 
 # 使⽤DeepSeek模型
@@ -36,5 +37,16 @@ partial_variables={"format_instructions": parser.get_format_instructions()}
 # print(parser.get_format_instructions())
 # 使⽤LCEL语法组合⼀个简单的链
 chain = prompt | llm | parser
-for str in chain.stream({"query": "给我讲个有关程序员的笑话"}):
-    print(str)
+# for str in chain.stream({"query": "给我讲个有关程序员的笑话"}):
+#     print(str)
+chain2 = prompt | llm | parser
+
+ch = {"1": chain, "2": chain2}
+
+# example
+# ch = {}
+# for i in ...:
+#     ch[i.name] = chain
+
+chain3 = RunnableParallel(**ch)
+print(chain3.invoke({"query": "给我讲个有关程序员的笑话"}))
