@@ -10,7 +10,7 @@ import urllib3
 from dao import userDAO
 from models import db
 from spider import crawler,test
-from ai import ai_get_history, ai_get_keywords, ai_delete_history, ai_recommend
+from sort import ai_get_history, ai_get_keywords, ai_delete_history, ai_recommend
 
 app = Flask(__name__)
 CORS(app)
@@ -113,8 +113,8 @@ def get__result(session_id, question):
     print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    收到会话{session_id}的问题{question}')
     
     # keys, flag = ai_get_keywords(session_id, question) #调用AI获取关键词
-    # keys = ['手机','手表']
-    # flag = 1
+    keys = ['手机','手表','手环','手镯','手办']
+    flag = 1
 
     if flag:
         nt = userDAO.new_talk_id(session_id)
@@ -199,10 +199,34 @@ def new(username):
         return json_response(code=500, message="新对话创建失败", reason="用户不存在")
 
 @app.route('/test', methods=['GET'], strict_slashes=False)
-def main_test():
+def main_test(session):
     print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    testing...')
-    test()
-    return json_response(message="test")
+    keys = ['手机','手表']
+    flag = 1
+
+    if flag:
+        nt = userDAO.new_talk_id(session_id)
+
+        threads =[]
+
+        for key in keys: #根据关键词爬取网站，结果以json返回
+            thread = threading.Thread(
+                target=threaded_crawler, 
+                args=(app, key, session_id, nt)
+            )
+            threads.append(thread)
+            thread.start()
+        
+        for thread in threads:
+            thread.join()
+
+        tip = "我认为你可能需要的商品是 "
+        res = '_'.join(keys)
+        return json_response(message=tip+','.join(keys), result=res)
+    else:
+        keys = userDAO.find_keys(session_id)
+        res = '_'.join(keys)
+        return json_response(message=None, result=res)
 
 if __name__ == '__main__':
     # app.run(debug=True)

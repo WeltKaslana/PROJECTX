@@ -255,6 +255,7 @@ def taobao_Crawler_main(driver, KEYWORD, pageStart, pageEnd, session_id, nt):
         for i in range(pageStart + 1, pageEnd + 1):
             taobao_page_turning(driver, i)
             taobao_goods_list.extend(taobao_get_goods(driver, i, session_id, KEYWORD, nt))
+
     except Exception as exc:
         print(f"淘宝Crawler_main函数错误！Error：{exc}")
     return taobao_goods_list
@@ -492,10 +493,10 @@ def jd_search_goods(driver, KEYWORD):
         # 京东搜索按钮（核心修改：选择器替换）
         submit = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#search-2014 > div > button > i')))
         #key
-        if submit :
-            print(3)
-        else:
-            print(4)
+        # if submit :
+        #     print(3)
+        # else:
+        #     print(4)
         #search-2014 > div > button > i
         
         input.clear()
@@ -720,7 +721,7 @@ def save_json_result(data, session_id,key):
         return None
 
 def crawler(app, keys, session_id, nt):
-    goods_list = []
+    # goods_list = []
     lock = threading.Lock()
     if keys:  # 当flag为True且keys列表不为空时执行爬取
         pageStart = 1
@@ -728,52 +729,61 @@ def crawler(app, keys, session_id, nt):
         # 将关键词列表转换为字符串（用空格连接）
         print(f"开始爬取组合关键词: {keys}")
 
-        # 获取淘宝登录后的浏览器实例
+        # # 获取淘宝登录后的浏览器实例
         # taobao_driver = load_taobao_valid_cookies()
-        # 获取京东登录后的浏览器实例
-        jd_driver = load_jd_valid_cookies()
+        # # 获取京东登录后的浏览器实例
+        # jd_driver = load_jd_valid_cookies()
 
-        # 定义线程函数
-        def taobao_crawl():
-            nonlocal goods_list
-            with app.app_context(): 
-                taobao_goods = taobao_Crawler_main(taobao_driver, keys, pageStart, pageEnd, session_id, nt)
-            with lock:
-                goods_list.extend(taobao_goods)
+        # # 定义线程函数
+        # def taobao_crawl():
+        #     nonlocal goods_list
+        #     with app.app_context(): 
+        #         taobao_goods = taobao_Crawler_main(taobao_driver, keys, pageStart, pageEnd, session_id, nt)
+        #     with lock:
+        #         goods_list.extend(taobao_goods)
 
-        def jingdong_crawl():
-            nonlocal goods_list
-            with app.app_context():
-                jingdong_goods = jd_Crawler_main(jd_driver, keys, pageStart, pageEnd, session_id, nt)       
-            with lock:
-                goods_list.extend(jingdong_goods)
+        # def jingdong_crawl():
+        #     nonlocal goods_list
+        #     with app.app_context():
+        #         jingdong_goods = jd_Crawler_main(jd_driver, keys, pageStart, pageEnd, session_id, nt)       
+        #     with lock:
+        #         goods_list.extend(jingdong_goods)
 
-        threads = []
+        # threads = []
 
-        # 创建线程
+        # # 创建线程
         # taobao_thread = threading.Thread(target=taobao_crawl)
-        jd_thread = threading.Thread(target=jingdong_crawl)
+        # jd_thread = threading.Thread(target=jingdong_crawl)
 
         # threads.append(taobao_thread)
-        threads.append(jd_thread)
+        # threads.append(jd_thread)
 
-        # 启动线程
+        # # 启动线程
         # taobao_thread.start()
-        jd_thread.start()
+        # jd_thread.start()
 
-        # 等待线程完成
-        for thread in threads:
-            thread.join()
+        # # 等待线程完成
+        # for thread in threads:
+        #     thread.join()
 
-        # 关闭浏览器
+        # # 关闭浏览器
         # taobao_driver.quit()
+        # jd_driver.quit()
+        
+        taobao_driver = load_taobao_valid_cookies()
+        taobao_goods = taobao_Crawler_main(taobao_driver, keys, pageStart, pageEnd, session_id, nt)
+        taobao_driver.quit()
+
+        jd_driver = load_jd_valid_cookies()
+        jingdong_goods = jd_Crawler_main(jd_driver, keys, pageStart, pageEnd, session_id, nt)
         jd_driver.quit()
 
     # 构建返回结果
     result_data = {
         "keywords": keys,
         "session_id": session_id,
-        "goods": goods_list
+        "jingdong_goods": jingdong_goods,
+        "taobao_goods": taobao_goods,
     }
 
     key = result_data["keywords"]
