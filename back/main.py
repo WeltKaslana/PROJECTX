@@ -12,7 +12,7 @@ from models import db
 from spider import crawler
 
 from sort import ai_get_history, ai_get_keywords, ai_delete_history, ai_recommend
-from sort import test
+# from sort import test
 
 app = Flask(__name__)
 CORS(app)
@@ -142,16 +142,37 @@ def get__result(session_id, question):
         res = '_'.join(keys)
         return json_response(message=None, result=res)
     
+
+thread_local = threading.local()
 @app.route('/result/<string:session_id>/<string:question>/<string:keys>', methods=['GET'], strict_slashes=False)
 def get_result(session_id, question, keys):
     key_list = keys.split("_")
-    
     print('-'*50)
-    print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    正在对会话{session_id}的问题‘{question}’进行推荐')
+    print(f'{datetime.now(pytz.timezone("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S")}    正在对会话{session_id}的问题‘{question}’进行推荐')
     
-    res = ai_recommend(session_id=session_id, question=question, keys=key_list)
-    return json_response(message="得到推荐结果", result=res)
+    # 为当前请求创建独立的结果列表
+    thread_local.results = []
+    lock = threading.Lock()
+    
+    def worker(app, session_id, question, key):
+        try:
+            with app.app_context():
+                res = ai_recommend(session_id=session_id, question=question, keys=key)
+                with lock:
+                    thread_local.results.append(res)
+        except Exception as e:
+            print(f"Thread error for key '{key}': {str(e)}")
 
+    threads = []
+    for key in key_list:
+        t = threading.Thread(target=worker, args=(app, session_id, question, key))
+        threads.append(t)
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    return json_response(message="得到推荐结果", result=thread_local.results)
 # 删除历史记录
 @app.route('/delete/<string:session_id>', methods=['GET'], strict_slashes=False)
 def delete(session_id):
@@ -203,7 +224,7 @@ def new(username):
 @app.route('/test', methods=['GET'], strict_slashes=False)
 def main_test():
     print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    testing...')
-    test()
+    # test()
     return json_response(message="test")
 
 if __name__ == '__main__':
