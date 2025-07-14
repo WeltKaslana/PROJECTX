@@ -110,7 +110,7 @@ def threaded_crawler(app, key, session_id, nt):
 
 # 查询结果
 @app.route('/keywords/<string:session_id>/<string:question>', methods=['GET'], strict_slashes=False)
-def get__result(session_id, question):
+def get_keywords(session_id, question):
     print('-'*50)
     print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    收到会话{session_id}的问题{question}')
     
@@ -151,15 +151,17 @@ def get_result(session_id, question, keys):
     print(f'{datetime.now(pytz.timezone("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S")}    正在对会话{session_id}的问题‘{question}’进行推荐')
     
     # 为当前请求创建独立的结果列表
-    thread_local.results = []
+    results = []
     lock = threading.Lock()
     
     def worker(app, session_id, question, key):
         try:
             with app.app_context():
-                res = ai_recommend(session_id=session_id, question=question, keys=key)
+                res = ai_recommend(session_id=session_id, question=question, key=key)
+                # res = 1
+                print(res)
                 with lock:
-                    thread_local.results.append(res)
+                    results.append(res)
         except Exception as e:
             print(f"Thread error for key '{key}': {str(e)}")
 
@@ -172,7 +174,10 @@ def get_result(session_id, question, keys):
     for t in threads:
         t.join()
 
-    return json_response(message="得到推荐结果", result=thread_local.results)
+    if not hasattr(thread_local, 'results'):
+        thread_local.results = []
+
+    return json_response(message="得到推荐结果", result=results)
 # 删除历史记录
 @app.route('/delete/<string:session_id>', methods=['GET'], strict_slashes=False)
 def delete(session_id):

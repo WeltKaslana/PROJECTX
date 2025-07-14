@@ -181,7 +181,8 @@ def ai_recommend(
     """
     
     #  原始数据
-    products = userDAO.find_goods(session_id, key)
+    products = userDAO.find_goods(session_id=session_id, keyword=key)
+    # print("原始数据：", products)
     
     # 数据校验
     required_fields = ["name", "price", "deals", "img_url", "goods_url", "shop_url"]
@@ -213,7 +214,8 @@ def ai_recommend(
 
     输出要求：
     - 排序规则需具体
-    - 输出数据要完整全面
+    - 输出的商品数据要包含名字价格销量
+    - 不需要输出全部的商品，只需要输出排序后的前几名
 
     {format_instructions}
     """
@@ -263,6 +265,7 @@ def ai_recommend(
 
     # 调用模型
     try:
+        print(1)
         result = chain_with_history.invoke(
             input={
                 "products": products_str,
@@ -297,7 +300,19 @@ def ai_recommend(
                 shop_url=original["shop_url"],
             ))
     
-    return final_products
+    
+    res = []
+    for i in final_products:
+        res.append({
+            "name": i.name,
+            "price": i.price,
+            "deals": i.deals,
+            "img_url": i.img_url,
+            "goods_url": i.goods_url,
+            "shop_url": i.shop_url,
+        })
+
+    return res
 
 
 

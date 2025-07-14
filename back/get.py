@@ -20,8 +20,8 @@ def send_get(url: str, params: dict = None) -> None:
         print(dict.get('reason'))
     except requests.exceptions.RequestException as e:
         print(f"GET 请求失败: {e}")
-        dict=response.json()
-        print(dict)
+        # dict=response.json()
+        # print(dict)
 
 def send_post(url: str, data: dict = None, json: dict = None) -> None:
     """
@@ -50,5 +50,6 @@ def send_post(url: str, data: dict = None, json: dict = None) -> None:
 # 示例调用
 if __name__ == "__main__":
     # 发送 GET 请求示例
-    send_get("http://localhost:8080/keywords/xDJTomato_0001/我想要买点饮料，可以给我推荐什么牌子吗")
+    send_get("http://localhost:8080/result/xDJTomato_0001/我想要买点手上戴的饰品/手镯_手环")
+    # send_get("http://localhost:8080/keywords/xDJTomato_0001/我想要买点手上戴的饰品")
     # send_get("http://localhost:8080/test")
