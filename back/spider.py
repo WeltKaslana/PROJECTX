@@ -485,12 +485,30 @@ def jd_search_goods(driver, KEYWORD):
         print(f"正在京东搜索商品: {KEYWORD}")
         # 京东搜索框（核心修改：选择器替换）
         input = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#key')))  # 京东搜索框ID为"key"
+        # if input :
+        #     print(1)
+        # else:
+        #     print(2)
         # 京东搜索按钮（核心修改：选择器替换）
-        submit = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#search button')))
-
+        submit = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#search-2014 > div > button > i')))
+        #key
+        if submit :
+            print(3)
+        else:
+            print(4)
+        #search-2014 > div > button > i
+        
         input.clear()
         input.send_keys(KEYWORD)
-        submit.click()
+
+
+        #先尝试点击，如果不行就强制点击
+        try:
+            submit.click()
+        except exception as e:
+            print(e)
+            driver.execute_script("arguments[0].click();", submit)
+
         time.sleep(2)
 
         # 京东搜索可能打开新标签页，切换到最新标签页
