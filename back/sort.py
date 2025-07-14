@@ -6,6 +6,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_deepseek import ChatDeepSeek
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_redis import RedisChatMessageHistory
+# from langchain_core.runnables import RunnableParallel
 from langchain_core.runnables.history import RunnableWithMessageHistory 
 from langchain_core.output_parsers import StrOutputParser # 导⼊字符串输出解析器
 import os
