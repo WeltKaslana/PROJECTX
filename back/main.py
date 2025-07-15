@@ -170,12 +170,12 @@ def get_result(session_id, question, keys):
         t = threading.Thread(target=worker, args=(app, session_id, question, key))
         threads.append(t)
         t.start()
+        # results.append(userDAO.find_goods(session_id, key))
 
     for t in threads:
         t.join()
 
-    if not hasattr(thread_local, 'results'):
-        thread_local.results = []
+        
 
     return json_response(message="得到推荐结果", result=results)
 # 删除历史记录

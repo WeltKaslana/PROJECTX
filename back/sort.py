@@ -179,7 +179,7 @@ def ai_recommend(
     key: str,
     # products: List[dict],
     user_preferences: Optional[str] = None,
-) -> List[Product]:
+):
     """
     完整商品信息排序函数
     
