@@ -65,7 +65,10 @@ def ai_get_history(session_id: str):
     )
     meshistory = []
     for message in history.messages:
-        meshistory.append(metamessage(type(message), message.content))
+        meshistory.append({
+            'type':str(message.type), 
+            'content':message.content,
+            })
     return meshistory
 # test
 # print("历史消息：") # 显示当前历史消息
