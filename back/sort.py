@@ -289,11 +289,7 @@ def ai_recommend(
     # user_msg = f"请求排序（），偏好：{user_preferences or '无'}"
     # ai_msg = f"排序规则：{result.sorting_rules}（输出{len(result.sorted_products)}件）"
     # redis_history.add_user_message(user_msg)
-    ai_msg1 = f'根据用户需求{question}，推荐{key}商品如下'
-    ai_msg2 = f'{result.sorted_products}'
-
-    redis_history.add_ai_message(ai_msg1)
-    redis_history.add_ai_message(ai_msg2)
+    
     
     # 将原始数据映射到结果中
     final_products = []
@@ -322,6 +318,12 @@ def ai_recommend(
             "goods_url": i.goods_url,
             "shop_url": i.shop_url,
         })
+
+    ai_msg1 = f'根据用户需求{question}，推荐{key}商品如下'
+    ai_msg2 = f'{res}'
+
+    redis_history.add_ai_message(ai_msg1)
+    redis_history.add_ai_message(ai_msg2)
 
     return res
 
