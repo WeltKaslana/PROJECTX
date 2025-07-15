@@ -114,9 +114,9 @@ def get_keywords(session_id, question):
     print('-'*50)
     print(f'{datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d %H:%M:%S")}    收到会话{session_id}的问题{question}')
     
-    # keys, flag = ai_get_keywords(session_id, question) #调用AI获取关键词
-    keys = ['手机','手表']
-    flag = 1
+    keys, flag = ai_get_keywords(session_id, question) #调用AI获取关键词
+    # keys = ['手机','手表']
+    # flag = 1
 
     if flag:
         nt = userDAO.new_talk_id(session_id)
