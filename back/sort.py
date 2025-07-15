@@ -111,9 +111,16 @@ def ai_get_keywords(session_id:str, question: str):
             分类结果：""") | llm | StrOutputParser()
     )
     result = router_chain.invoke({"question": question}) # 调用路由链，获取问题类型
-    
     print("问题类型：", result) # 打印问题类型
+
+    redis_history = RedisChatMessageHistory(
+        redis_url = "redis://47.98.143.59:6379",# Redis 连接URL
+        session_id = session_id, # 会话ID
+    )
     if int(result) == 0: # 如果问题类型不是关于商品推荐
+        redis_history.add_user_message(question)
+        ai_msg = "正在为您进行筛选推荐"
+        redis_history.add_ai_message(ai_msg)
         return([], False) # 返回空列表和False
     
     # 实例化解析器、提示词模板
@@ -126,10 +133,7 @@ def ai_get_keywords(session_id:str, question: str):
     )
      # 将提示模板与模型组合成⼀个处理链
     chain = prompt | llm | parser
-    redis_history = RedisChatMessageHistory(
-        redis_url = "redis://47.98.143.59:6379",# Redis 连接URL
-        session_id = session_id, # 会话ID
-    )
+
     # 转换函数
     # def get_session_history(session_id: str) -> BaseChatMessageHistory:
     #     temp = InMemoryHistory()
@@ -282,10 +286,14 @@ def ai_recommend(
         raise RuntimeError(f"排序失败：{str(e)}")
     
     # 10. 保存本轮对话到历史（便于后续调整）
-    user_msg = f"请求排序（），偏好：{user_preferences or '无'}"
-    ai_msg = f"排序规则：{result.sorting_rules}（输出{len(result.sorted_products)}件）"
-    redis_history.add_user_message(user_msg)
-    redis_history.add_ai_message(ai_msg)
+    # user_msg = f"请求排序（），偏好：{user_preferences or '无'}"
+    # ai_msg = f"排序规则：{result.sorting_rules}（输出{len(result.sorted_products)}件）"
+    # redis_history.add_user_message(user_msg)
+    ai_msg1 = f'根据用户需求{question}，推荐{key}商品如下'
+    ai_msg2 = f'{result.sorted_products}'
+
+    redis_history.add_ai_message(ai_msg1)
+    redis_history.add_ai_message(ai_msg2)
     
     # 将原始数据映射到结果中
     final_products = []
